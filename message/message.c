@@ -5,8 +5,13 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <libc.h>
+
+#define COMPRESS 1
 
 #include "message.h"
+
+#include "hash.h"
 
 message *newMsg(){
     message *t = calloc(1,sizeof (message));
@@ -92,6 +97,7 @@ uint8_t reverse8(uint8_t b){
     return b;
 }
 
+// 将报文头部写入buff
 ssize_t encodeHeader(message *msg,void *buff){
     uint16_t *p = buff;
     *p ++ = htons(msg->ID);
@@ -107,32 +113,68 @@ ssize_t encodeHeader(message *msg,void *buff){
     return (ssize_t)((void *)p - buff);
 }
 
+static HashTab *ht = NULL; // 用于压缩名字域的
+
+static uint16_t getPos(char *name){ // 辅助函数，查找名字，已有则返回压缩的两个字节,否则返回0
+    uint16_t t = 0xc000;
+    uint16_t *p = search(ht,name);
+    if(p != NULL)
+        return t | *p;
+    return 0;
+}
+
 // 将一个字符串转化为指定的格式
-// 注：我的格式不使用压缩的方式
+// 注：我的格式不使用压缩的方式  没压缩已经是过去式了，现在压缩了哦哈哈哈
 // 返回转化后的占用内存字节数
-ssize_t encodeName(char *name,void *buff){
-    char *num = buff,*p = buff+1;
+ssize_t encodeName(char *name,void *buff,void *origin){
+    uint16_t pos,data;
+    char *num = buff,*p = buff+1,*last_name = name;
     uint8_t cnt = 0;
+#if COMPRESS
+    if((pos = getPos(name)) != 0){ //找到了这个名字
+//        printf("get key:%s pos:%04x\n",name,pos);
+        *(uint16_t *)buff = htons(pos);
+        return 2;
+    }
+#endif
     while(*name != 0){
         if(*name == '.'){
+#if COMPRESS
+            data = (uint16_t)((void *)num-origin);
+            insert(ht,last_name,&data, sizeof(uint16_t)); //加入这个名字 注意这里不会出现反复加入的问题，如果已经有name了，现在已经返回了
+//            printf("insert key:%s pos:%04x\n",last_name,data);
+#endif
             *num = cnt;
             num = p++;
             cnt = 0;
             name++;
+#if COMPRESS
+            if((pos = getPos(name)) != 0){ //新的一段可以压缩 名字以前存在过
+                *(uint16_t *)num = htons(pos);
+                return (ssize_t)((void *)num-buff) + 2;
+            }
+            last_name = name;
+#endif
             continue;
         }
         *p++ = *name ++;
         cnt ++;
     }
+#if COMPRESS
+    //最后一段名字也加入哈希表中
+    data = (uint16_t)((void *)num-origin);
+    insert(ht,last_name,&data, sizeof(uint16_t)); //加入这个名字 注意这里不会出现反复加入的问题，如果已经有name了，现在已经返回了
+//    printf("insert key:%s pos:%04x\n",last_name,data);
+#endif
     *num = cnt;
     *p++ = 0;
     return (ssize_t)((void *)p - buff);
 }
 
 // 将问题编进报文 返回占用字节数
-ssize_t encodeQues(question *ques,void *buff){
+ssize_t encodeQues(question *ques,void *buff,void *origin){
     uint16_t *t = buff;
-    ssize_t n = encodeName(ques->q_name,buff);
+    ssize_t n = encodeName(ques->q_name,buff,origin);
     t = (void *)t + n;
     *t++ = htons(ques->q_type);
     *t++ = htons(ques->q_class);
@@ -140,15 +182,20 @@ ssize_t encodeQues(question *ques,void *buff){
 }
 
 // 将资源记录编进报文 返回占用字节数
-ssize_t encodeRR(RR *rr,void *buff){
+ssize_t encodeRR(RR *rr,void *buff,void *origin){
     uint16_t *t = buff;
-    ssize_t n = encodeName(rr->name,buff);
+    ssize_t n = encodeName(rr->name,buff,origin);
     t = (void *)t + n;
     *t++ = htons(rr->type);
     *t++ = htons(rr->class);
     *((uint32_t *)t) = htonl(rr->TTL); t = (uint16_t *)((uint32_t *)t + 1);
-    *t++ = htons(rr->data_length);
-    memcpy(t,rr->data,rr->data_length);
+    if(rr->data_type == BINARY_TYPE){ // binary_type下data_length才是真正的length
+        *t++ = htons(rr->data_length);
+        memcpy(t, rr->data, rr->data_length);
+    }else{ // 字符串类型 该类型下data_length不确定是多少的data_length字段形同虚设，由string_data编码后来决定
+        *t = htons((uint16_t)encodeName(rr->string_data,t+1,origin)); // 把真正的length放入报文中
+        rr->data_length = ntohs(*t++);
+    }
     return (ssize_t)((void *)t - buff) + (ssize_t)(rr->data_length);
 }
 
@@ -158,19 +205,22 @@ ssize_t encodeRR(RR *rr,void *buff){
 //否则会段错误，这里为了方便默认buff长度足够
 //返回报文的长度 出错则返回-1
 ssize_t encode(message *msg,void *buff){
+    ht = NewHashTab(); // 新建哈希表，用于名字压缩时搜索名字
     void *p = buff;
     ssize_t n;
     n = encodeHeader(msg,p);
     p = p + n;
     for(int i=0;i<msg->q_count;i++) {
-        n = encodeQues(msg->ques[i], p);
+        n = encodeQues(msg->ques[i], p,buff);
         p = p + n;
     }
     for(int i =0;i<3;i++)
         for(int j = 0;j < msg->RR_count[i];j++){
-            n = encodeRR(msg->resourse_record[i][j],p);
+            n = encodeRR(msg->resourse_record[i][j],p,buff);
             p = p + n;
         }
+    DestroyHashTab(ht); // 销毁哈希表
+    ht = NULL;
     return (ssize_t)(p - buff);
 }
 
@@ -222,6 +272,7 @@ message *decode(void *buff){
         //printf("name %s type:%d class:%d\n",msg->ques[i]->q_name,msg->ques[i]->q_type,msg->ques[i]->q_class);
     }
     RR *rr;
+    unsigned int offset; //记录数据长度所应该产生的偏移
     for(int i=0;i < 3;i++){
         for(int j=0;j < msg->RR_count[i];j++){
             rr = malloc(sizeof (*rr));
@@ -231,17 +282,19 @@ message *decode(void *buff){
             rr->class = ntohs(*p++);
             rr->TTL = ntohl(*(uint32_t *)p); p = (uint16_t *)((uint32_t *)p + 1);
             rr->data_length = ntohs(*p++);
+            offset = rr->data_length; //这个才是后面应该用的偏移
             if(rr->type == CNAME || rr->type == NS) { //数据类型应该是字符串
                 decodeName(p, buff, rr->string_data);
                 rr->data_type = STRING_TYPE;
                 rr->data = malloc(MAX_LEN+2);
-                rr->data_length = encodeName(rr->string_data,rr->data);
+                // 改进后发现下面这句话没什么用 不过留着吧
+                rr->data_length = encodeName(rr->string_data,rr->data,buff); // 这个点是产生bug的原因，之前拿这个data_length当偏移，这可不是实际的偏移
             } else {
                 rr->data_type = BINARY_TYPE;
-                rr->data = malloc(rr->data_length); //data中存放原始的二进制信息
+                rr->data = malloc(rr->data_length+2); //data中存放原始的二进制信息
                 memcpy(rr->data,p,rr->data_length);
             }
-            p = (void *)p + rr->data_length;
+            p = (void *)p +  offset;//rr->data_length; 原本这个是由bug的
         }
     }
     return msg;
@@ -256,7 +309,7 @@ void setRRName(RR *rr,char *s){
 void setRRNameData(RR *rr,char *name){
     ssize_t n;
     rr->data = malloc(MAX_LEN);
-    n = encodeName(name,rr->data);
+    n = encodeName(name,rr->data,NULL); // 改进后这句话也没有什么用，不过放这里吧 其实只要设置了data_type就能正常工作 string_type下其实data和data_length都没有意义
     rr->data_length = n;
     rr->data_type = STRING_TYPE;
     strncpy(rr->string_data,name,MAX_LEN);
@@ -313,10 +366,17 @@ void showMsg(message *msg){
                 printf("name:%s  type:%s class:%s TTL:%u len:%u data:%s\n",
                    msg->resourse_record[i][j]->name,type[msg->resourse_record[i][j]->type],
                    class[msg->resourse_record[i][j]->class],msg->resourse_record[i][j]->TTL,msg->resourse_record[i][j]->data_length,msg->resourse_record[i][j]->string_data);
-            else
-                printf("name:%s  type:%s class:%s TTL:%u len:%u data:...\n",
-                       msg->resourse_record[i][j]->name,type[msg->resourse_record[i][j]->type],
-                       class[msg->resourse_record[i][j]->class],msg->resourse_record[i][j]->TTL,msg->resourse_record[i][j]->data_length);
+            else {
+                char str[40];
+                if(msg->resourse_record[i][j]->type == AAAA)
+                    inet_ntop(AF_INET6,msg->resourse_record[i][j]->data,str,39);
+                else
+                    inet_ntop(AF_INET,msg->resourse_record[i][j]->data,str,39);
+                printf("name:%s  type:%s class:%s TTL:%u len:%u data:%s\n",
+                       msg->resourse_record[i][j]->name, type[msg->resourse_record[i][j]->type],
+                       class[msg->resourse_record[i][j]->class], msg->resourse_record[i][j]->TTL,
+                       msg->resourse_record[i][j]->data_length,str);
+            }
         }
         printf("-----------------end of %s---------------\n",rr_t[i]);
     }

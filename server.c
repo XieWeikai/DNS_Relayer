@@ -14,7 +14,7 @@
 
 void *decodeName(void *buff,void *origin,char *name);
 
-int main(){
+void test(){
     char buff[1024];
     message *msg = newMsg();
     question q;
@@ -24,14 +24,14 @@ int main(){
     setFlag(msg,AD);
     q.q_type = A;
     q.q_class = IN;
-    setQNAME(&q,"www.baidu.com");
+    setQNAME(&q,"qq.com");
     addQuestion(msg,&q);
     ssize_t n = encode(msg,buff);
     showMem(buff,n);
     showMsg(msg);
     destroyMsg(msg);
     // 构造报文结束
-
+    printf("above is my own message!\n\n");
 
     int fd = socket(AF_INET,SOCK_DGRAM,0);
     struct sockaddr_in servaddr;
@@ -46,11 +46,53 @@ int main(){
     showMem(buff,n);
     mmm = decode(buff);
     showMsg(mmm);
+    printf("above is respone from DNS and is decoded!!!\n\n\n");
+
+    printf("later is a test\n");
     n = encode(mmm,buff);
+    sendto(fd,buff,n,0,(struct sockaddr *)&servaddr,sizeof (servaddr));
+
     showMem(buff,n);
     msg = decode(buff);
     showMsg(msg);
+}
 
+void test2(){
+    char *buff[1024];
+    ssize_t n;
+    message *msg = newMsg();
+    msg->ID = 0x1234;
+    setResp(msg);
+    setFlag(msg,RD);
+    setFlag(msg,RA);
+    setRCODE(msg,NO_ERR);
+    question q;
+    setQNAME(&q,"www.baidu.com");
+    q.q_class = IN;q.q_type = A;
+    addQuestion(msg,&q);
+    RR rr;
+    setRRName(&rr,"www.baidu.com");
+    rr.class = IN;
+    rr.data_length = 4;
+    rr.type = A;
+    uint32_t ip = htonl(0xc0a80304); // 192.168.3.4
+    setRRData(&rr,&ip,sizeof(ip));
+    addRR(msg,&rr,ANSWER);
+    showMsg(msg);
+    n = encode(msg,buff);
+    showMem(buff,n);
+
+    int fd = socket(AF_INET,SOCK_DGRAM,0);
+    struct sockaddr_in servaddr;
+
+    servaddr.sin_port = htons(53);
+    servaddr.sin_family = AF_INET;
+    inet_pton(AF_INET, "192.168.43.1", &servaddr.sin_addr);
+    sendto(fd,buff,n,0,(struct sockaddr *)&servaddr,sizeof (servaddr));
+}
+
+int main(){
+    test();
 
 //    int fd1;
 //    char str[50];

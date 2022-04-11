@@ -29,10 +29,10 @@
 #define STATUS 2  //a server status request (STATUS)
 
 //Rcode
-#define NO_ERR 0
-#define FMT_ERR 1
-#define SERVER_FAILURE 2
-#define NAME_ERR 3
+#define NO_ERR 0 // no error
+#define FMT_ERR 1 //Format error - The name server wasunable to interpret the query.
+#define SERVER_FAILURE 2  //Server failure - The name server was unable to process this query due to a problem with the name server.
+#define NAME_ERR 3 //domain name referenced in the query does not exist.
 
 // flag
 #define AA 5 //Authoritative Answer
