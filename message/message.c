@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
-#include <libc.h>
+#include <arpa/inet.h>
+
 
 #define COMPRESS 1
 

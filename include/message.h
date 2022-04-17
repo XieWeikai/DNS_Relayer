@@ -5,7 +5,7 @@
 #ifndef DNS_MESSAGE_H
 #define DNS_MESSAGE_H
 
-#include <ctype.h>
+//#include <ctype.h>
 #include <stdlib.h>
 
 #define MAX_LEN 256
