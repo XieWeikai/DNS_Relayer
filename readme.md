@@ -10,7 +10,7 @@
 
 ## 设计
 
-![design](/Users/admin/Desktop/学校相关/大二/computer_networks/design/dns/doc/img/design.png)
+![design](./doc/img/design.png)
 
 目前的设计如上图。
 
