@@ -8,17 +8,17 @@
 
 报文头结构如下
 
-<img src="/Users/admin/Desktop/学校相关/大二/computer_networks/design/dns/doc/img/header.png" alt="header" style="zoom:80%;" />
+<img src="./img/header.png" alt="header" style="zoom:80%;" />
 
 各字段解释详见老师发的RFC1035.pdf第26页。
 
 报头后紧接着的是`QDCOUNT`个questions,一条question结构如下
 
-![question](/Users/admin/Desktop/学校相关/大二/computer_networks/design/dns/doc/img/question.png)
+![question](./img/question.png)
 
 紧接着三个`RR section`,分别为`answer section`、`authority section`、`additional section`。每个`section`内有数条`RR (resource record)`,条目数分别为报头中的`ANCOUNT`、`NSCOUNT`、`ARCOUNT`。一条`RR`的结构如下
 
-![RR](/Users/admin/Desktop/学校相关/大二/computer_networks/design/dns/doc/img/RR.png)
+![RR](./img/RR.png)
 
 ### 报文结构定义
 
