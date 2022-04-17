@@ -3,261 +3,107 @@
 ////
 
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-#include <pthread.h>
-#include <unistd.h>
-
-#include "linkList.h"
-#include "cache.h"
-
-// 双向链表里存的就是这玩意
-typedef struct {
-    char key[50+1];
-    time_t saveTime; //存入缓存的时间
-    time_t TTL;   // 存活时间
-    void *data;  // 数据
-    size_t dataSize;
-}saveUnit;
-
-void printIntLink(LinkList *l){
-    printf("head ");
-    saveUnit *ui;
-    for(linkNode *t = l->head->next;t != l->tail;t = t->next) {
-        ui = t->data;
-        printf("<%s,%d>  ", ui->key,*(int*)ui->data);
-    }
-    printf("tail\n");
-}
-
-int main(){
-    Cache *cache = CreateCache(3);
-    int value,*p;
-    char op[20],key[30];
-    while(1){
-        printf(">>>");
-        scanf("%s",op);
-        printf("op:%s\n",op);
-        if(strncmp(op,"put",20) == 0){
-            //printf("get to put\n");
-            scanf("%s%d",key,&value);
-            CachePut(cache,key,&value, sizeof(int),30);
-            printf("put <%s,%d>  -->>",key,value);
-            printIntLink(cache->lList);
-        }else if(strncmp(op,"get",20) == 0){
-            //printf("get to get\n");
-            scanf("%s",key);
-            p = CacheGet(cache,key);
-            if(p == NULL)
-                printf("no such value!\n");
-            else{
-                printf("get <%s,%d>\n",key,*p);
-                free(p);
-            }
-            printIntLink(cache->lList);
-        } else
-            break;
-    }
-    return 0;
-}
-
-/*#define MY 0
-
-#if !MY
-#include <stdio.h>
-#include <sys/socket.h>
-#include <dns_util.h>
-#include <unistd.h>
-
-#include "message.h"
-
-void *decodeName(void *buff,void *origin,char *name);
-
-void test(){
-    char buff[1024];
-    message *msg = newMsg();
-    question q;
-    msg->ID = 0x8d17;
-    setQuery(msg);
-    setFlag(msg,RD);
-    setFlag(msg,AD);
-    q.q_type = A;
-    q.q_class = IN;
-    setQNAME(&q,"qq.com");
-    addQuestion(msg,&q);
-    ssize_t n = encode(msg,buff);
-    showMem(buff,n);
-    showMsg(msg);
-    destroyMsg(msg);
-    // 构造报文结束
-    printf("above is my own message!\n\n");
-
-    int fd = socket(AF_INET,SOCK_DGRAM,0);
-    struct sockaddr_in servaddr;
-
-    message *mmm;
-    servaddr.sin_port = htons(53);
-    servaddr.sin_family = AF_INET;
-    inet_pton(AF_INET, "192.168.43.1", &servaddr.sin_addr);
-    sendto(fd,buff,n,0,(struct sockaddr *)&servaddr,sizeof (servaddr));
-    printf("after send to\n");
-    n = recvfrom(fd,buff,1024,0,NULL,0);
-    showMem(buff,n);
-    mmm = decode(buff);
-    showMsg(mmm);
-    printf("above is respone from DNS and is decoded!!!\n\n\n");
-
-    printf("later is a test\n");
-    n = encode(mmm,buff);
-    sendto(fd,buff,n,0,(struct sockaddr *)&servaddr,sizeof (servaddr));
-
-    showMem(buff,n);
-    msg = decode(buff);
-    showMsg(msg);
-}
-
-void test2(){
-    char *buff[1024];
-    ssize_t n;
-    message *msg = newMsg();
-    msg->ID = 0x1234;
-    setResp(msg);
-    setFlag(msg,RD);
-    setFlag(msg,RA);
-    setRCODE(msg,NO_ERR);
-    question q;
-    setQNAME(&q,"www.baidu.com");
-    q.q_class = IN;q.q_type = A;
-    addQuestion(msg,&q);
-    RR rr;
-    setRRName(&rr,"www.baidu.com");
-    rr.class = IN;
-    rr.data_length = 4;
-    rr.type = A;
-    uint32_t ip = htonl(0xc0a80304); // 192.168.3.4
-    setRRData(&rr,&ip,sizeof(ip));
-    addRR(msg,&rr,ANSWER);
-    showMsg(msg);
-    n = encode(msg,buff);
-    showMem(buff,n);
-
-    int fd = socket(AF_INET,SOCK_DGRAM,0);
-    struct sockaddr_in servaddr;
-
-    servaddr.sin_port = htons(53);
-    servaddr.sin_family = AF_INET;
-    inet_pton(AF_INET, "192.168.43.1", &servaddr.sin_addr);
-    sendto(fd,buff,n,0,(struct sockaddr *)&servaddr,sizeof (servaddr));
-}
-
-int main(){
-    test();
-
-//    int fd1;
-//    char str[50];
-//    struct sockaddr_in serAddr,remoteAddr, addr;
-//    socklen_t len = sizeof (addr);
-//    remoteAddr.sin_port = htons(53);
-//    inet_pton(AF_INET, "192.168.43.1", &remoteAddr.sin_addr);
-//    remoteAddr.sin_family = AF_INET;
-//
-//    serAddr.sin_port = htons(43);
-//    serAddr.sin_addr.s_addr = htons(INADDR_ANY);
-//    serAddr.sin_family = AF_INET;
-//    fd1 = socket(AF_INET,SOCK_DGRAM,0);
-//    bind(fd1,&serAddr,sizeof (serAddr));
-//    int pid;
-//    if((pid = fork()) == 0){
-//        printf("child receive from\n");
-//        n = recvfrom(fd1,buff,1024,0,&addr,&len);
-//        if(n == -1)
-//            perror("receive error");
-//        printf("child receive from %s:%d-----\n",
-//               inet_ntop(AF_INET, &addr.sin_addr, str, sizeof(str)),
-//               ntohs(addr.sin_port));
-//        showMem(buff,n);
-//    }else{
-//        sleep(5);
-//        printf("parent send to\n");
-//        showMem(buff,n);
-//        sendto(fd1,buff,n,0,&serAddr,sizeof (remoteAddr));
-//        if(n == -1)
-//            perror("send to error");
-//    }
-//
-//    sleep(10);
-    return 0;
-}
-
-#endif
-
-#if MY
-//#include <stdio.h>
-//#include <inttypes.h>
-//#include <arpa/inet.h>
-//#include <sys/socket.h>
-//#include <wrap.h>
-//#include <dns_sd.h>
-//#include <ctype.h>
-#include <errno.h>
-#include <stdio.h>
 #include <string.h>
 #include <netinet/in.h>
-#include <dns_util.h>
-#include <ctype.h>
-#include <unistd.h>
+#include <arpa/inet.h>
+
 #include "wrap.h"
 
-#define MAX_SIZE 1024
+#include "thread_pool.h"
+#include "message.h"
 
-#define PORT 8000
+#define COLOR_NONE "\033[0m"
+#define RED "\033[1;31m"
+
+#define DNS_PORT 53
+#define DNS_IP "192.168.43.1"
+
+typedef struct {
+    message *msg;
+    struct sockaddr_in cliAddr;
+}arg;
+
+int globalSocket;
+
+void handler(void *ar){
+    printf(RED"get into handler !!!\n"COLOR_NONE);
+    char buff[1024];
+    int n;
+    arg *pa = ar;
+    n = encode(pa->msg,buff);
+
+    //创建socket发送请求
+    struct sockaddr_in servaddr;
+    int sockfd;
+    socklen_t servaddr_len;
+
+    sockfd = Socket(AF_INET,SOCK_DGRAM,0); // 创建socket
+    // 设置服务器ip+端口
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(53);
+    if(!(inet_pton(AF_INET, DNS_IP, &servaddr.sin_addr))){
+        fprintf(stderr,RED"error occur when parsing dns server ip:%s\n"COLOR_NONE,DNS_IP);
+        return ;
+    }
+    // 向服务器发送信息
+    if(sendto(sockfd,buff,n,0,(struct sockaddr*)&servaddr,sizeof(servaddr)) == -1)
+        perr_exit("sendto error");
+    printf(RED"sendto server and waiting for respone ......\n"COLOR_NONE);
+    // 设置接收超时时间 1s
+    struct timeval tv;
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
+    setsockopt(sockfd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof (tv));
+
+    //接收服务器信息
+    n = recvfrom(sockfd,buff,1024,0,NULL,0);
+    if(n == -1) {
+        fprintf(stderr, RED"failto get message from DNS server !\n"COLOR_NONE);
+        return;
+    }
+    // 回复用户
+    sendto(globalSocket,buff,n,0,(struct sockaddr*)&pa->cliAddr, sizeof(pa->cliAddr));
+    printf(RED"sent to user\n"COLOR_NONE);
+
+    // 释放msg空间
+    destroyMsg(pa->msg);
+    free(ar); // 释放参数空间
+    Close(sockfd); // 关闭该socket
+}
 
 int main(){
-    struct sockaddr_in serverAddr,cliAddr;
-    socklen_t cliAddrLen = sizeof (cliAddrLen);
-    char str[MAX_SIZE];
+    Pool tp = CreateThreadPool(10);
+    struct sockaddr_in cliAddr,global_addr;
+    socklen_t cliLen;
 
-    int fd;
-    fd = Socket(AF_INET,SOCK_DGRAM,0);
+    // 设置好全局socket
+    globalSocket = Socket(AF_INET,SOCK_DGRAM,0);
+    bzero(&global_addr, sizeof(global_addr));
+    global_addr.sin_family = AF_INET;
+    global_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    global_addr.sin_port = htons(DNS_PORT);
+    Bind(globalSocket,(struct sockaddr*)&global_addr, sizeof(global_addr));
 
-    bzero(&serverAddr,sizeof (serverAddr));
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serverAddr.sin_port = htons(PORT);
-
-    Bind(fd,(struct sockaddr*)&serverAddr,sizeof (serverAddr));
-
-    printf("start to receive message!\n");
-    char buff[MAX_SIZE];
     int n;
+    char buff[1024];
+    char str[101];
+    message *msg;
+    arg *a;
+    printf("Accepting connections ...\n");
     while(1){
-        n = recvfrom(fd,buff,MAX_SIZE,0,(struct sockaddr*)&cliAddr,&cliAddrLen);
-        //sleep(1);
-        if(n == -1){
-            perr_exit("error");
-            fprintf(stderr,"recvfrom error! %s\n",strerror(errno));
-            continue;
-        }
-        printf("receive from %s:%d\n",
+        cliLen = sizeof(cliLen);
+        n = recvfrom(globalSocket,buff,1024,0,(struct sockaddr*)&cliAddr,&cliLen);
+        if(n == -1)
+            perr_exit("receive from error");
+        printf("received from %s at PORT %d\n",
                inet_ntop(AF_INET, &cliAddr.sin_addr, str, sizeof(str)),
                ntohs(cliAddr.sin_port));
-        for(int i=0;i<n;i++) {
-            buff[i] = toupper(buff[i]);
-            printf("%c",buff[i]);
-        }
-        printf("\n");
-        if(buff[0] == 'B' && buff[1] == 'Y' && buff[2] == 'E'){
-            sendto(fd,"bye\n",4,0,(struct sockaddr*)&cliAddr,sizeof (cliAddr));
-            break;
-        }
-        n = sendto(fd,buff,n,0,(struct sockaddr*)&cliAddr,sizeof (cliAddr));
-
-        if(n == -1)
-            fprintf(stderr,"sendtoErr:%s\n",strerror(errno));
+        msg = decode(buff);
+        a = malloc(sizeof(arg));
+        a->cliAddr = cliAddr;
+        a->msg = msg;
+        AddTask(tp,handler,a);
     }
-    close(fd);
-    printf("close(fd)\n");
     return 0;
 }
-#endif
-*/
