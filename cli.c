@@ -74,5 +74,10 @@ int main(int argc, char *argv[])
     showMsg(msg); //展示报文
     printf("\n\nmemory:\n");
     showMem(buff,n);  // 展示内存
+
+    // 试一下编码能不能和发来的一样
+    printf("\n\nthis is a test!!\n");
+    n = encode(msg,buff);
+    showMem(buff,n);
     return 0;
 }

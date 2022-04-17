@@ -8,9 +8,10 @@ include_directories(include)
 aux_source_directory(tool TOOL)
 aux_source_directory(message MES)
 aux_source_directory(cache CACHE)
+aux_source_directory(pool POOL)
 
 add_executable(server
-        server.c ${TOOL} ${MES} ${CACHE})
+        server.c ${TOOL} ${MES} ${CACHE} ${POOL})
 
 add_executable(cli
         cli.c ${TOOL} ${CACHE} ${MES})

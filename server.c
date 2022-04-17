@@ -2,7 +2,66 @@
 //// Created by 谢卫凯 on 2022/3/31.
 ////
 
-#define MY 0
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h>
+
+#include "linkList.h"
+#include "cache.h"
+
+// 双向链表里存的就是这玩意
+typedef struct {
+    char key[50+1];
+    time_t saveTime; //存入缓存的时间
+    time_t TTL;   // 存活时间
+    void *data;  // 数据
+    size_t dataSize;
+}saveUnit;
+
+void printIntLink(LinkList *l){
+    printf("head ");
+    saveUnit *ui;
+    for(linkNode *t = l->head->next;t != l->tail;t = t->next) {
+        ui = t->data;
+        printf("<%s,%d>  ", ui->key,*(int*)ui->data);
+    }
+    printf("tail\n");
+}
+
+int main(){
+    Cache *cache = CreateCache(3);
+    int value,*p;
+    char op[20],key[30];
+    while(1){
+        printf(">>>");
+        scanf("%s",op);
+        printf("op:%s\n",op);
+        if(strncmp(op,"put",20) == 0){
+            //printf("get to put\n");
+            scanf("%s%d",key,&value);
+            CachePut(cache,key,&value, sizeof(int),30);
+            printf("put <%s,%d>  -->>",key,value);
+            printIntLink(cache->lList);
+        }else if(strncmp(op,"get",20) == 0){
+            //printf("get to get\n");
+            scanf("%s",key);
+            p = CacheGet(cache,key);
+            if(p == NULL)
+                printf("no such value!\n");
+            else{
+                printf("get <%s,%d>\n",key,*p);
+                free(p);
+            }
+            printIntLink(cache->lList);
+        } else
+            break;
+    }
+    return 0;
+}
+
+/*#define MY 0
 
 #if !MY
 #include <stdio.h>
@@ -201,3 +260,4 @@ int main(){
     return 0;
 }
 #endif
+*/

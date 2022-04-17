@@ -29,7 +29,7 @@ void DestroyHashTab(HashTab *h);
 
 // 插入，插入时会将数据复制一份，故要有数据大小
 // 若传入NULL则啥也不干
-void insert(HashTab *ht,char *name,void *data,size_t size);
+void *insert(HashTab *ht,char *name,void *data,size_t size);
 
 // 查找数据，无则返回空
 // 若传入NULL则啥也不干

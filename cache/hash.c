@@ -27,6 +27,7 @@ void DestroyHashTab(HashTab *h){
             next = t->next;
             free(t->data);
         }
+    free(h->h);
     free(h);
 }
 
@@ -67,9 +68,9 @@ static void rescale(HashTab *ht,size_t size){
 
 // 插入，插入时会将数据复制一份，故要有数据大小
 // 若该name已存在则修改数据
-void insert(HashTab *ht,char *name,void *data,size_t size){
+void *insert(HashTab *ht,char *name,void *data,size_t size){
     if(ht == NULL)
-        return;
+        return NULL;
     void *t = malloc(size);
     memcpy(t,data,size);
     unsigned int ha = hash(name) % ht->len;
@@ -77,7 +78,7 @@ void insert(HashTab *ht,char *name,void *data,size_t size){
         if(strcmp(tmp->name,name) == 0){
             free(tmp->data);
             tmp->data = t;
-            return;
+            return t;
         }
     }
     Node *n = newNode(name,t);
@@ -86,6 +87,7 @@ void insert(HashTab *ht,char *name,void *data,size_t size){
     ht->num ++;
     if(ht->num >= ht->len * 2)
         rescale(ht,ht->len<<1);
+    return t;
 }
 
 // 查找数据，无则返回空
