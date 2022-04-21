@@ -27,7 +27,10 @@ void freeLinkNode(linkNode *nod);
 LinkList *NewLinkList();
 
 // 销毁链表
-void DestroyLinkList(LinkList *l);
+// 链表内data域内可能也需要额外处理，可以通过传destroyFunc
+// 在释放data前，先调用destroyFunc(data)
+// 若传NULL则不做处理
+void DestroyLinkList(LinkList *l,void (*destroyFunc)(void *));
 
 // 放入头部
 linkNode *PutInHead(LinkList *l,linkNode *nod);

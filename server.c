@@ -7,6 +7,7 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 
 #include "wrap.h"
 
@@ -16,7 +17,7 @@
 #define COLOR_NONE "\033[0m"
 #define RED "\033[1;31m"
 
-#define DNS_PORT 53
+#define DNS_PORT 8080
 #define DNS_IP "192.168.43.1"
 
 typedef struct {
@@ -91,7 +92,7 @@ int main(){
     message *msg;
     arg *a;
     printf("Accepting connections ...\n");
-    while(1){
+    for(;;){
         cliLen = sizeof(cliLen);
         n = recvfrom(globalSocket,buff,1024,0,(struct sockaddr*)&cliAddr,&cliLen);
         if(n == -1)
@@ -105,5 +106,6 @@ int main(){
         a->msg = msg;
         AddTask(tp,handler,a);
     }
+    ClosePool(tp);
     return 0;
 }

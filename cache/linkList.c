@@ -50,10 +50,12 @@ void RemoveFromLinkList(LinkList *l, linkNode *nod) {
     nod->next = nod->pre = NULL;
 }
 
-void DestroyLinkList(LinkList *l) {
+void DestroyLinkList(LinkList *l,void (*destroyFunc)(void *data)) {
     linkNode *t = l->head->next, *next = NULL;
     while (t != l->tail) {
         next = t->next;
+        if(destroyFunc != NULL)
+            destroyFunc(t->data);
         free(t->data);
         free(t);
         t = next;

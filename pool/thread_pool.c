@@ -34,8 +34,13 @@ ThreadPool *CreateThreadPool(int num){
     ThreadPool *pool = malloc(sizeof(ThreadPool));
     pool->q = NewSafeQueue();
     pthread_t tid;
-    for(int i=0;i<num;i++)
-        pthread_create(&tid,NULL,worker,pool->q);
+    pthread_attr_t attr;
+    for(int i=0;i<num;i++) {
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, 1); // 设置这个属性的线性不需要join 若用默认属性，则不join的线程的资源不会被回收也就是内存泄漏 线程池中的线程不需要join
+        pthread_create(&tid, &attr, worker, pool->q);
+        pthread_attr_destroy(&attr);
+    }
     return pool;
 }
 

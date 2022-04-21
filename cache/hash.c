@@ -6,7 +6,7 @@
 
 #include "hash.h"
 
-#define INIT_SIZE 1
+#define INIT_SIZE 1024
 
 // 新建哈希表
 HashTab *NewHashTab(){
@@ -26,6 +26,7 @@ void DestroyHashTab(HashTab *h){
         for(Node *t=h->h[i];t != NULL;t = next) {
             next = t->next;
             free(t->data);
+            free(t);
         }
     free(h->h);
     free(h);

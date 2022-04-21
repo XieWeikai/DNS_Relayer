@@ -29,9 +29,14 @@ Cache *CreateCache(int maxSize){
     return c;
 }
 
+void destroySavaUnit(void *date){
+    saveUnit *ui = date;
+    free(ui->data);
+}
+
 void DestroyCache(Cache *c) {
     DestroyHashTab(c->hTab);
-    DestroyLinkList(c->lList);
+    DestroyLinkList(c->lList,destroySavaUnit);
     pthread_rwlock_destroy(&c->mux);
     free(c);
 }

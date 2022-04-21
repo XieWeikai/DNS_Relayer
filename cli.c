@@ -74,5 +74,6 @@ int main(int argc, char *argv[])
     showMsg(msg); //展示报文
     printf("\n\nmemory:\n");
     showMem(buff,n);  // 展示内存
+    destroyMsg(msg);
     return 0;
 }
