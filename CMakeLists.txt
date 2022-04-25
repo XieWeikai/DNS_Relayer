@@ -20,8 +20,12 @@ add_executable(server
 add_executable(cli
         cli.c ${TOOL} ${CACHE} ${MES})
 
+add_executable(test
+        test.c ${TOOL} ${MES} ${CACHE} ${POOL})
+
 target_link_libraries(server PUBLIC pthread)
 target_link_libraries(cli PUBLIC pthread)
+target_link_libraries(test PUBLIC pthread)
 
 
 

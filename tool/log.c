@@ -1,15 +1,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <pthread.h>
 #include "log.h"
-
-static struct {
-    bool quiet;
-    enum log_level level;
-} log_state = {
-        .quiet = false,
-        .level = LOG_LEVEL_INFO,
-};
 
 static const char *log_level_str[] = {
         "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL",
@@ -21,12 +14,18 @@ static const char *level_colors[] = {
 
 static const char *color_reset = "\x1b[0m";
 
+static struct {
+    bool quiet;
+    enum clog_level level;
+} log_state = {
+        .quiet = false,
+        .level = CLOG_LEVEL_INFO,
+};
 
-void log_set_level(enum log_level level) {
-    log_state.level = level;
-}
+static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-void log_log(enum log_level level, const char *format, ...) {
+void clog_log(enum clog_level level, const char *format, ...) {
+    pthread_mutex_lock(&log_mutex);
     if (!log_state.quiet && level >= log_state.level) {
         fprintf(stderr, "%s%-5s%s ", level_colors[level], log_level_str[level], color_reset);
         va_list args;
@@ -36,9 +35,13 @@ void log_log(enum log_level level, const char *format, ...) {
         fprintf(stderr, "\n");
         fflush(stderr);
     }
+    pthread_mutex_unlock(&log_mutex);
 }
 
-void log_set_quiet(bool quiet) {
+void clog_set_level(enum clog_level level) {
+    log_state.level = level;
+}
+
+void clog_set_quiet(bool quiet) {
     log_state.quiet = quiet;
 }
-
