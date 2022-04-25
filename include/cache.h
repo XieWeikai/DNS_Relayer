@@ -17,10 +17,15 @@ typedef struct cache {
     int maxSize; // 最大缓存个数
     pthread_rwlock_t mux; // 多读单写锁
 //    pthread_mutex_t mu; // 防止取操作中多次删除某个超出TTL的缓存  好吧这里有点怪了
+
+    void *(*copy)(void *data); // 复制函数，用于复制一份要存入的数据
+    void (*delete)(void *data); // 销毁函数，用于销毁一份存入的数据
 } Cache;
 
 // 创建一个最多存放maxSize个条目的缓存
-Cache *CreateCache(int maxSize);
+// 传入的copy 和 delete可以为NULL
+// 为NULL 则执行默认操作
+Cache *CreateCache(int maxSize,void *(*copy)(void *data),void (*delete)(void *data));
 
 // 销毁缓存
 void DestroyCache(Cache *c);
