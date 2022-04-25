@@ -98,6 +98,7 @@ void *SafeDeque(SafeQueue *q){
     return data;
 }
 
+// 这个函数不会释放q的空间，需要使用者自行释放
 void SafeDestroy(SafeQueue *q){
     q->destroyed = 1;
     pthread_cond_broadcast(&q->q_ready);

@@ -139,8 +139,8 @@ void *CacheGet(Cache *c, char *key) {
             c->delete(ui->data);
         RemoveFromLinkList(c->lList,lkn);
         freeLinkNode(lkn);
-        pthread_rwlock_unlock(&c->mux);
         c->len --;
+        pthread_rwlock_unlock(&c->mux);
         return NULL;
     }
     // 移到开头

@@ -80,7 +80,7 @@ void putInCache(void *arg){
     Cache *c = arg;
     int pos;
     Val *v;
-    for(int i=0;i<100000;i++){
+    for(int i=0;i<50000;i++){
         pos = rand()%6;
         v = malloc(sizeof(Val));
         v->key = malloc(10);
@@ -100,7 +100,7 @@ void getInCache(void *arg){
     Cache *c = arg;
     Val *v;
     int pos;
-    for(int i=0;i<100000;i++){
+    for(int i=0;i<50000;i++){
         pos = rand() % 6;
 //        pthread_mutex_lock(&ttt);
         v = CacheGet(c,name[pos]);
@@ -108,7 +108,7 @@ void getInCache(void *arg){
         if(v != NULL) {
             if (*(v->v) != value[pos]) {
                 fprintf(stderr, "error:can not get the expected value!!!!!\n");
-            }
+            }else printf("pass! key:%s value:%d\n",v->key,*(v->v));
             deleteVal(v);
         }
     }
@@ -120,9 +120,9 @@ void testCache1(){
     Cache *c = CreateCache(100,copyVal,deleteVal);
     AddTask(p,putInCache,c);
     AddTask(p,getInCache,c);
-    sleep(5);
-    DestroyCache(c);
+    sleep(20);
     ClosePool(p);
+    DestroyCache(c);
 }
 
 
@@ -162,8 +162,8 @@ void testCache2(){
     AddTask(p,putInCache2,c);
     AddTask(p,getInCache2,c);
     sleep(5);
-    DestroyCache(c);
     ClosePool(p);
+    DestroyCache(c);
 }
 
 // -------------------------above is test Cache---------------------------------------//
@@ -194,9 +194,7 @@ void consumer(void *arg){
     printf("get out of consumer\n");
 }
 
-int main(){
-//    srand(time(NULL));
-//    testCache2();
+void testQueue(){
     Pool p = CreateThreadPool(3);
     safequeue q = NewSafeQueue();
     AddTask(p,consumer,q);
@@ -205,5 +203,11 @@ int main(){
     ClosePool(p);
     free(q);
     printf("close pool\n");
+}
+
+int main(){
+    srand(time(NULL));
+    testCache1();
+
     return 0;
 }
