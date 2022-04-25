@@ -64,5 +64,6 @@ void ClosePool(ThreadPool *pool){
     for(int i=0;i<pool->num;i++)
         pthread_join(pool->ids[i],NULL); // 等待工作线程退出
     free(pool->ids);
+    free(pool->q);
     free(pool);
 }
