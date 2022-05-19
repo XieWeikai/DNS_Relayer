@@ -32,7 +32,7 @@ LinkList *NewLinkList();
 // 若传NULL则不做处理
 void DestroyLinkList(LinkList *l,void (*destroyFunc)(void *));
 
-// 放入头部
+// 放入头部,返回指向放入节点的指针
 linkNode *PutInHead(LinkList *l,linkNode *nod);
 
 // 放入尾部

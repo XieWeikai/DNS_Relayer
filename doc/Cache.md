@@ -12,6 +12,12 @@
 - 查询和插入的时间复杂度都是O(1)  ~~（*当然前提是hash函数足够好哈）*~~
 - ~~一些未知的潜伏的bug~~
 
+
+
+下面给出一个大致的原理图(不够具体，实际复杂一些)
+
+![cache](./img/cache.png)
+
 ---
 
 ## 接口
@@ -24,7 +30,9 @@ typedef struct cache {
 } Cache;
 
 // 创建一个最多存放maxSize个条目的缓存
-Cache *CreateCache(int maxSize);
+// 传入的copy 和 delete可以为NULL
+// 为NULL 则执行默认操作
+Cache *CreateCache(int maxSize,void *(*copy)(void *data),void (*delete)(void *data));
 
 // 销毁缓存
 void DestroyCache(Cache *c);
@@ -41,6 +49,23 @@ void CachePut(Cache *c, char *key, void *data, size_t size, time_t TTL);
 // 注意返回的指针指向的空间要由使用者自行释放！！！！（为了防止并发操作带来的冲突 所以返回的数据是额外拷贝的一份 交由使用者管理 故需要使用者释放）
 void *CacheGet(Cache *c, char *key);
 ```
+注意，`CreateCache`函数的`copy`和`delete`参数，当调用`CachePut`时，首先会尝试用`copy`函数作用于`data`,再将`copy`函数的返回值存起来。在缓存中某一缓存条目会被删除时，则会调用`delete`作用于存入的`data`指针。当调用`CacheGet`时，也会尝试用`copy`函数复制一份数据，并将指向该数据的指针返回给调用者，返回的空间交由调用者自行处理。
+
+若`copy`和`delete`为`NULL`则有可以认为有如下两个默认的函数进行相应处理
+
+```c
+void *copy(void *data){
+  void *res = malloc(size); // 该size即调用CachePut时传入的size
+  memcpy(res,data,size);
+  return res;
+}
+
+void delete(void *data){
+  free(data);
+}
+```
+
+
 
 ---
 
