@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <pthread.h>
-#include "clog/clog.h"
+#include "clog.h"
 
 static const char *log_level_str[] = {
         "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL",
