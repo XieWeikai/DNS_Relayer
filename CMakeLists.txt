@@ -23,5 +23,8 @@ add_executable(cli
 target_link_libraries(server PUBLIC pthread)
 target_link_libraries(cli PUBLIC pthread)
 
+add_executable(file_reader_test
+        test/file_reader_test.c ${TOOL} ${CACHE})
+target_link_libraries(file_reader_test pthread)
 
 
