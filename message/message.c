@@ -34,7 +34,7 @@ void setResp(message *msg){
 
 //设置操作码
 void setOpcode(message *msg,uint16_t op){
-    msg->flag &= (0xf << 1);
+    msg->flag &= ~(0xf << 1);
     msg->flag |= (op << 1);
 }
 
@@ -312,7 +312,7 @@ void setRRNameData(RR *rr,char *name){
     ssize_t n;
     rr->data = malloc(MAX_LEN);
     //n = encodeName(name,rr->data,NULL); // 改进后这句话也没有什么用，不过放这里吧 其实只要设置了data_type就能正常工作 string_type下其实data和data_length都没有意义
-    rr->data_length = n;
+//    rr->data_length = n; // 和上面那句话一起删去了
     rr->data_type = STRING_TYPE;
     strncpy(rr->string_data,name,MAX_LEN);
 }

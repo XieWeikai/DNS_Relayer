@@ -120,6 +120,7 @@ void CachePut(Cache *c,char *key, void *data, size_t size, time_t TTL) {
 // 如果直接返回指向存在缓存中的数据的指针
 // 有可能在使用这块空间时
 // 该空间因为别处的调用而被改变了
+// 没查到则返回NULL
 void *CacheGet(Cache *c, char *key) {
     saveUnit *ui;
     linkNode **t,*lkn;

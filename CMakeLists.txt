@@ -14,6 +14,9 @@ SET(CMAKE_BUILD_TYPE "Debug")
 SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
 SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 
+add_executable(relayer
+        relayer.c ${TOOL} ${MES} ${CACHE} ${POOL})
+
 add_executable(server
         server.c ${TOOL} ${MES} ${CACHE} ${POOL})
 
@@ -23,6 +26,7 @@ add_executable(cli
 add_executable(test
         test.c ${TOOL} ${MES} ${CACHE} ${POOL})
 
+target_link_libraries(relayer PUBLIC pthread)
 target_link_libraries(server PUBLIC pthread)
 target_link_libraries(cli PUBLIC pthread)
 target_link_libraries(test PUBLIC pthread)
