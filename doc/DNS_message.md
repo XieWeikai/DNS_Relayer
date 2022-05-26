@@ -237,7 +237,7 @@ r.class = IN;
 r.TTL = 4000;
 setRRName(&r,"www.baidu.com");
 setRRNameData(&r,"shifen.hahalala.wawa.ii");
-add(msg,&r,ANSWER);
+addRR(msg,&r,ANSWER);
 ```
 
 ## 将message结构变为可发送报文

@@ -6,11 +6,15 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <time.h>
 
 #include "thread_pool.h"
 #include "cache.h"
+#include "wrap.h"
+#include "message.h"
 
 char *name[] = {"xwk","wql","yr","hr","yyj","ysfj"};
 int value[] = {1,2,3,4,5,6};
@@ -206,8 +210,8 @@ void testQueue(){
 }
 
 int main(){
-    srand(time(NULL));
-    testCache1();
+//    srand(time(NULL));
+//    testCache1();
 
     return 0;
 }

@@ -84,11 +84,22 @@ void destroyMsg(message *msg){
         free(msg->ques[i]);
     for(int i = 0;i < 3;i++){
         for(int j = 0;j < msg->RR_count[i];j++) {
-            free(msg->resourse_record[i][j]->data);
+            if(msg->resourse_record[i][j]->data_type == BINARY_TYPE)
+                free(msg->resourse_record[i][j]->data);
             free(msg->resourse_record[i][j]);
         }
     }
     free(msg);
+}
+
+// 释放掉additional 段中的内容
+void releaseAdditionalRR(message *msg){
+    for(int i=0;i<msg->RR_count[ADDITIONAL];i++){
+        if(msg->resourse_record[ADDITIONAL][i]->data_type == BINARY_TYPE)
+            free(msg->resourse_record[ADDITIONAL][i]->data);
+        free(msg->resourse_record[ADDITIONAL][i]);
+    }
+    msg->RR_count[ADDITIONAL] = 0;
 }
 
 //翻转8个bits 纯属为了离奇的标志位编的这段
@@ -288,7 +299,7 @@ message *decode(void *buff){
             if(rr->type == CNAME || rr->type == NS) { //数据类型应该是字符串
                 decodeName(p, buff, rr->string_data);
                 rr->data_type = STRING_TYPE;
-                rr->data = malloc(MAX_LEN+2);
+                //rr->data = malloc(MAX_LEN+2); // 这句话改进后也没什么用
                 // 改进后发现下面这句话没什么用 不过留着吧
                 //rr->data_length = encodeName(rr->string_data,rr->data,buff); // 这个点是产生bug的原因，之前拿这个data_length当偏移，这可不是实际的偏移
             } else {
@@ -310,7 +321,8 @@ void setRRName(RR *rr,char *s){
 //设置RR的data字段为字符串
 void setRRNameData(RR *rr,char *name){
     ssize_t n;
-    rr->data = malloc(MAX_LEN);
+    rr->data = NULL; // data域不使用了
+    //rr->data = malloc(MAX_LEN);
     //n = encodeName(name,rr->data,NULL); // 改进后这句话也没有什么用，不过放这里吧 其实只要设置了data_type就能正常工作 string_type下其实data和data_length都没有意义
 //    rr->data_length = n; // 和上面那句话一起删去了
     rr->data_type = STRING_TYPE;

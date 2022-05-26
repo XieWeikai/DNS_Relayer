@@ -131,6 +131,9 @@ int addRR(message *msg,RR *q,int type);
 //释放一条message结构占用的空间
 void destroyMsg(message *msg);
 
+// 去除一段报文中的Additionail段
+void releaseAdditionalRR(message *msg);
+
 //将msg结构编码为可以实际发送的报文
 //注意给够buff的长度
 //否则会段错误，这里为了方便默认buff长度足够
