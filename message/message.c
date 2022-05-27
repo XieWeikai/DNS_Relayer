@@ -246,12 +246,16 @@ ssize_t encode(message *msg,void *buff){
 }
 
 // 解码以label形式存储的name
-// origin 是整个报文的开头，因为某些name以Pointe为指针，要用到整个报文
+// origin 是整个报文的开头，因为某些name以Pointer为指针，要用到整个报文
 // 返回解码后应该继续解析的位置
 void *decodeName(void *buff,void *origin,char *name){
     uint8_t *p = (uint8_t *)(buff+1);
     uint8_t *num = buff;
     uint16_t tmp;
+    if(*num == 0){ // 直接不用解析了 空的name
+        *name = 0;
+        return (void *)p;
+    }
     while(*num != 0){
         if((uint8_t)(p-num) > *num){ //下一小节
             num = p++;

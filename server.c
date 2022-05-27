@@ -19,12 +19,13 @@
 
 #include "file_reader.h"
 
+#include "arg.h"
+
 #define DEBUG 0
 
 #define STR_LEN 128
 #define MAX_NUM 10
 
-#define DNS_PORT 53
 
 typedef struct {
 //    message *msg;
@@ -50,6 +51,7 @@ typedef struct {
 int globalSocket; // 和客户端通信的socket
 Cache *globalCache;
 struct file_reader *localReader;
+struct sockaddr_in servaddr; // 设置Local DNS server的地址
 
 // 依据name type 返回key key存入res中，成功则返回true,失败返回false
 // 如调用calcKey("www.baidu.com",CNAME,buf)
@@ -158,7 +160,7 @@ void showRequest(message *msg,enum clog_level level){
     typename[AAAA] = "AAAA";
     typename[PTR] = "PTR";
     char *p = typename[msg->ques[0]->q_type];
-    clog_log(level,"request for:%s type:%s",msg->ques[0]->q_name,p==NULL?"NONE":p);
+    clog_log(level,"request for:%s type:%s",msg->ques[0]->q_name,p==NULL?"???":p);
 //    log_info("request for:%s type:%s",msg->ques[0]->q_name,typename[msg->ques[0]->q_type]);
 }
 
@@ -268,22 +270,16 @@ void handler(void *ar) {
 
     //接下来开始中继功能
     //创建socket发送请求
-    struct sockaddr_in servaddr;
     int sockfd;
-    socklen_t servaddr_len;
 
     sockfd = Socket(AF_INET,SOCK_DGRAM,0); // 创建socket
 
-    // 设置接收超时时间 1s
+    // 设置接收超时时间 4s
     struct timeval tv;
     tv.tv_sec = 4;
     tv.tv_usec = 0;
     setsockopt(sockfd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof (tv));
 
-    // 设置服务器ip+端口
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(53);
-    inet_pton(AF_INET, "192.168.43.1", &servaddr.sin_addr);
 
     if(sendto(sockfd,parg->buff,parg->n,0,(struct sockaddr*)&servaddr,sizeof(servaddr)) == -1){// 转发报文到DNS服务器
         showRequest(replyMsg,CLOG_LEVEL_INFO);
@@ -297,7 +293,7 @@ void handler(void *ar) {
         return;
     }
     log_info("send message to Local DNS server and wait for response");
-    //接收服务器信息
+    //接收服务器信息 不需要知道服务器地址了，后面两参数填 NULL 0
     n = recvfrom(sockfd,buff,1024,0,NULL,0);
     if(n == -1){
         log_warn("something went wrong when try to recvfrom message from local DNS server ! err:%s\n",strerror(errno));
@@ -359,28 +355,98 @@ void tmpSend(void *buff,size_t n){
     close(sockfd);
 }
 
+void showHelp(){
+    FILE *fp = fopen("./man.txt","r");
+    if(fp == NULL) {
+        fprintf(stderr, "error:fail to open man.txt.can not show mannuals\nplease check if man.txt exists!\n");
+        return;
+    }
+    int ch;
+    while((ch = getc(fp)) != EOF)
+        putchar(ch);
+}
+
 int main(int argc,char **argv) {
-    Pool tp = CreateThreadPool(10);
-    log_info("Created a threadpool.Size of threadpool:%d",10);
+    Arg *argument = NewArg(argc,argv);
+    if(matchArg(argument,"--help","true")){
+        showHelp();
+        return 0;
+    }
+
+    int poolsize = getInt(argument,"poolsize");
+    poolsize = poolsize == 0 ? 10 : poolsize;
+    poolsize = poolsize > 20 ? 20 : poolsize;
+
+    Pool tp = CreateThreadPool(poolsize);
+    log_info("Created a threadpool.Size of threadpool:%d",poolsize);
     struct sockaddr_in cliAddr,global_addr;
     socklen_t cliLen;
 
     char str[101];
-    clog_set_level(CLOG_LEVEL_DEBUG);
+
+    enum clog_level debugLev = CLOG_LEVEL_INFO;
+    if(matchArg(argument,"debug","trace")){
+        log_info("set debug level:trace");
+        debugLev = CLOG_LEVEL_TRACE;
+    }else if(matchArg(argument,"debug","debug")){
+        log_info("set debug level:debug");
+        debugLev = CLOG_LEVEL_DEBUG;
+    }else if(matchArg(argument,"debug","info")){
+        log_info("set debug level:info");
+        debugLev = CLOG_LEVEL_INFO;
+    }else if(matchArg(argument,"debug","warn")){
+        log_info("set debug level:warn");
+        debugLev = CLOG_LEVEL_WARN;
+    }else if(matchArg(argument,"debug","error")){
+        log_info("set debug level:error");
+        debugLev = CLOG_LEVEL_ERROR;
+    }else if(matchArg(argument,"debug","fatal")){
+        log_info("set debug level:debug");
+        debugLev = CLOG_LEVEL_FATAL;
+    }else
+        log_info("set debug leve:info (default level)");
+    clog_set_level(debugLev);
     // 设置好全局socket
     globalSocket = Socket(AF_INET,SOCK_DGRAM,0);
     bzero(&global_addr, sizeof(global_addr));
     global_addr.sin_family = AF_INET;
     global_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    global_addr.sin_port = htons(DNS_PORT);
+
+    uint16_t PORT;
+    PORT = getInt(argument,"port");
+    PORT = PORT == 0 ? 53 : PORT;
+    global_addr.sin_port = htons(PORT);
     Bind(globalSocket,(struct sockaddr*)&global_addr, sizeof(global_addr));
     log_info("Set global socket.listen addr:%s:%d",inet_ntop(AF_INET,&global_addr.sin_addr,str,sizeof(str)),ntohs(global_addr.sin_port));
 
-    globalCache = CreateCache(1024,NULL,NULL);
-    log_info("initiate global cache.size:1024");
+    int cachesize = getInt(argument,"cachesize");
+    cachesize = cachesize <= 0 ? 1024 : cachesize;
+    globalCache = CreateCache(cachesize,NULL,NULL);
+    log_info("initiate global cache.size:%d\n",cachesize);
 
-    localReader = file_reader_alloc("dnsrelay.txt");
-    log_info("initate local file reader");
+    char *p = getStr(argument,"localfile");
+    if(p == NULL){
+        log_fatal("localfile needed !!! use --help for help");
+        return 0;
+    }
+    localReader = file_reader_alloc(p);
+    log_info("initate local file reader:%s",p);
+
+    // 设置服务器ip+端口
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(53);
+    p = getStr(argument,"dns");
+    if(p == NULL){
+        log_fatal("dns needed !!! use --help for help");
+        return 0;
+    }
+    if(!inet_pton(AF_INET, p, &servaddr.sin_addr)){
+        log_fatal("error:can not parse ip of Local DNS server");
+        return 0;
+    }
+    log_info("set DNS ip:%s",p);
+
+    DestroyArg(argument); // 清理存储的命令行参数
 
     int n;
     char buff[1024];

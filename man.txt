@@ -1,0 +1,30 @@
+usage:
+    server localfile=filename dns=local_dns_server_ip [options]
+
+    local_dns_server_ip is ip of your Local DNS server.When our program work as a relayer,it will send
+    message to the local_dns_server_ip.
+
+    filename is the file that stores a series of domain names and their ipv4 addresses.Each line is in
+    the form of: ip domain name.
+    e.g.  dnsrelay.txt
+    ...
+    74.125.207.113 i2.ytimg.com
+    74.125.207.113 i3.ytimg.com
+    ...
+
+options:
+    debug=level
+        level can be one of trace,debug,info,warn,error and fatal.Default level is info.
+
+    poolsize=num_of_thread_pool
+        Set the size of thread pool. Default size is 10.Size should not be more than 20.
+
+
+    cachesize=size
+        Set the size of cache, Default is 1024. Size should not be more than 2048.
+
+    port=portnumber
+        Set the listening port number to portnumber. Default is 53.
+
+    --help
+        Show this content.
