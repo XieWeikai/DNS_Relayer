@@ -209,9 +209,19 @@ void testQueue(){
     printf("close pool\n");
 }
 
-int main(){
+#include "arg.h"
+
+int main(int argc,char **argv){
 //    srand(time(NULL));
 //    testCache1();
+
+    Arg *arg = NewArg(argc,argv);
+
+    printf("check --help:%d\n", matchArg(arg, "--help", "true"));
+    printf("num:%d\n",getInt(arg,"num"));
+    printf("str:%s\n",getStr(arg,"str"));
+
+    DestroyArg(arg);
 
     return 0;
 }

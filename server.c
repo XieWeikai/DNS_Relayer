@@ -15,11 +15,13 @@
 #include "thread_pool.h"
 #include "message.h"
 #include "cache.h"
-#include "log.h"
+#include "clog.h"
+
+#include "file_reader.h"
 
 #define DEBUG 0
 
-#define STR_LEN 64
+#define STR_LEN 128
 #define MAX_NUM 10
 
 #define DNS_PORT 53
@@ -44,6 +46,11 @@ typedef struct {
     time_t ddl; // 过期时间
 } item;
 
+
+int globalSocket; // 和客户端通信的socket
+Cache *globalCache;
+struct file_reader *localReader;
+
 // 依据name type 返回key key存入res中，成功则返回true,失败返回false
 // 如调用calcKey("www.baidu.com",CNAME,buf)
 // 调用后buf中存的字符串为 "www.baidu.com:CNAME"
@@ -63,9 +70,6 @@ int calcKey(char *name, int type, char *res) {
     return true;
 }
 
-int globalSocket;
-Cache *globalCache;
-
 // 将item中存的资源记录填入msg的answer段中
 // 该函数为辅助函数
 // msg为待设置的报文 it为缓存中记录的一项数据 name为RR对应的name
@@ -79,6 +83,7 @@ void Item2Msg(message *msg, item *it, char *name) {
     if (it->type == A) {
         if(it->ipv4[0] == 0){// 非法域名屏蔽 ！！！！
             setRCODE(msg,NAME_ERR);
+            log_info("domain blocked !! name:%s respon with a NAME_ERR error",name);
             return;
         }
 
@@ -145,12 +150,16 @@ void checkItem(item *it){
 }
 
 // 展示一下请求报文中问题部分的内容
-void showRequest(message *msg){
+void showRequest(message *msg,enum clog_level level){
     static char *typename[50] = {NULL};
     typename[A] = "A";
     typename[CNAME] = "CNAME";
     typename[NS] = "NS";
-    log_info("request for:%s type:%s",msg->ques[0]->q_name,typename[msg->ques[0]->q_type]);
+    typename[AAAA] = "AAAA";
+    typename[PTR] = "PTR";
+    char *p = typename[msg->ques[0]->q_type];
+    clog_log(level,"request for:%s type:%s",msg->ques[0]->q_name,p==NULL?"NONE":p);
+//    log_info("request for:%s type:%s",msg->ques[0]->q_name,typename[msg->ques[0]->q_type]);
 }
 
 void tmpSend(void *buff,size_t n); // debug函数
@@ -161,7 +170,9 @@ void handler(void *ar) {
     arg *parg = ar;
     message *replyMsg = decode(parg->buff); // 要回复的msg
     releaseAdditionalRR(replyMsg); //把额外的段删去，不知为啥dig的请求中有时会带有additional段
-    showRequest(replyMsg);
+    setResp(replyMsg); // 设置为响应报文
+    setFlag(replyMsg,RA); // 设置flag
+    showRequest(replyMsg,CLOG_LEVEL_INFO);
 
 #if DEBUG
     log_debug("-----request-----");
@@ -185,11 +196,9 @@ void handler(void *ar) {
             log_debug("-----------------");
 #endif
             free(it);
-            setResp(replyMsg); // 设为响应报文
-            setFlag(replyMsg,RA); // 设置flag
             n = encode(replyMsg,buff);
             sendto(globalSocket,buff,n,0,(struct sockaddr*)(&parg->cliAddr), sizeof(parg->cliAddr));
-            log_info("get resource record in cache and respon to client !");
+            log_info("get resource record in cache and respon to client !\n");
             destroyMsg(replyMsg);
             free(parg);
             return;
@@ -210,8 +219,7 @@ void handler(void *ar) {
 #endif
                     free(it);
                     free(tit);
-                    setResp(replyMsg); // 设置为响应报文
-                    setFlag(replyMsg,RA); // 设置flag
+
                     n = encode(replyMsg,buff);
 #if DEBUG
                     tmpSend(buff,n);
@@ -219,7 +227,7 @@ void handler(void *ar) {
                     showMem(buff,n);
 #endif
                     sendto(globalSocket,buff,n,0,(struct sockaddr*)(&parg->cliAddr), sizeof(parg->cliAddr));
-                    log_info("get CNAME and A resource record in cache and respon to client !");
+                    log_info("get CNAME and A resource record in cache and respon to client !\n");
                     destroyMsg(replyMsg);
                     free(parg);
                     return;
@@ -230,8 +238,33 @@ void handler(void *ar) {
     }
     // 以上是从缓存查找资源记录的过程
     // 接下来尝试在文件中查找A记录
-
-    // 还没有从文件中查找的功能捏，暂时略过
+    char ip[17];
+    struct sockaddr_in tmpAddr;
+    RR r;
+    item tmp;
+    bzero(&tmp, sizeof(item));
+    bzero(&r, sizeof(RR));
+    if(qtype == A){
+        if(file_reader_get_a_record(localReader,name,ip) != NULL){ // 还真找到了
+            inet_pton(AF_INET, ip, &tmpAddr.sin_addr);
+            r.type = A;
+            r.class = IN;
+            r.TTL = 600000; // 随便设置一个长的TTL，因为本地的记录理论上来说是固定的
+            setRRName(&r,name);
+            setRRData(&r,&tmpAddr.sin_addr.s_addr, sizeof(uint32_t));
+            // 以上构造了一个RR
+            addRR2Item(&tmp,&r); // 将RR放入一个缓存项中
+            putItem(tmp.name,A,&tmp); // 将缓存项放入缓存中
+            Item2Msg(replyMsg,&tmp,tmp.name); // 将该缓存项中的内容放入message中
+            n = encode(replyMsg,buff);
+            sendto(globalSocket,buff,n,0,(struct sockaddr*)(&parg->cliAddr), sizeof(parg->cliAddr));
+            log_info("get A resource record from local file and respon to client !");
+            log_info("name:%s ip:%s\n",name,ip);
+            destroyMsg(replyMsg);
+            free(parg);
+            return ;
+        }
+    }
 
     //接下来开始中继功能
     //创建socket发送请求
@@ -243,7 +276,7 @@ void handler(void *ar) {
 
     // 设置接收超时时间 1s
     struct timeval tv;
-    tv.tv_sec = 1;
+    tv.tv_sec = 4;
     tv.tv_usec = 0;
     setsockopt(sockfd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof (tv));
 
@@ -253,7 +286,8 @@ void handler(void *ar) {
     inet_pton(AF_INET, "192.168.43.1", &servaddr.sin_addr);
 
     if(sendto(sockfd,parg->buff,parg->n,0,(struct sockaddr*)&servaddr,sizeof(servaddr)) == -1){// 转发报文到DNS服务器
-        log_warn("something went wrong when try to sent message to local DNS server ! err:%s",strerror(errno));
+        showRequest(replyMsg,CLOG_LEVEL_INFO);
+        log_warn("something went wrong when try to sent message to local DNS server ! err:%s\n",strerror(errno));
         setResp(replyMsg);
         setRCODE(replyMsg,SERVER_FAILURE);
         n = encode(replyMsg,buff);
@@ -262,11 +296,11 @@ void handler(void *ar) {
         free(parg);
         return;
     }
-
+    log_info("send message to Local DNS server and wait for response");
     //接收服务器信息
     n = recvfrom(sockfd,buff,1024,0,NULL,0);
     if(n == -1){
-        log_warn("something went wrong when try to recvfrom message to local DNS server ! err:%s",strerror(errno));
+        log_warn("something went wrong when try to recvfrom message from local DNS server ! err:%s\n",strerror(errno));
         setResp(replyMsg);
         setRCODE(replyMsg,SERVER_FAILURE);
         n = encode(replyMsg,buff);
@@ -277,7 +311,7 @@ void handler(void *ar) {
     }
     close(sockfd);// 关闭该临时socket
     sendto(globalSocket,buff,n,0,(struct sockaddr*)(&parg->cliAddr), sizeof(parg->cliAddr)); // 直接把从服务器得到的报文返回回去
-    log_info("reply with the message from local DNS server");
+    log_info("reply with the message from local DNS server\n");
     // 接下来要缓存服务器发回来的资源记录了
     RR *rr;
     item Ait,Nit,Cit; // 分别存放A类型记录 NS类型记录 CNAME类型记录
@@ -325,7 +359,7 @@ void tmpSend(void *buff,size_t n){
     close(sockfd);
 }
 
-int main() {
+int main(int argc,char **argv) {
     Pool tp = CreateThreadPool(10);
     log_info("Created a threadpool.Size of threadpool:%d",10);
     struct sockaddr_in cliAddr,global_addr;
@@ -345,6 +379,9 @@ int main() {
     globalCache = CreateCache(1024,NULL,NULL);
     log_info("initiate global cache.size:1024");
 
+    localReader = file_reader_alloc("dnsrelay.txt");
+    log_info("initate local file reader");
+
     int n;
     char buff[1024];
     arg *a;
@@ -355,7 +392,7 @@ int main() {
         if(n == -1)
             perr_exit("receive from error");
 
-        log_info("received from %x:%s at PORT %d",cliAddr.sin_addr.s_addr,
+        log_info("received from %s at PORT %d",
                inet_ntop(AF_INET, &cliAddr.sin_addr, str, sizeof(str)),
                ntohs(cliAddr.sin_port));
 
@@ -369,5 +406,8 @@ int main() {
         AddTask(tp,handler,a);
     }
     ClosePool(tp);
+    DestroyCache(globalCache);
+    close(globalSocket);
+    file_reader_free(localReader);
     return 0;
 }

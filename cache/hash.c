@@ -35,7 +35,7 @@ void DestroyHashTab(HashTab *h){
 // 辅助函数，新建节点
 static Node *newNode(char *name,void *data){
     Node *t = malloc(sizeof (*t));
-    strncpy(t->name,name,MAX_LEN);
+    strncpy(t->name,name,HASH_KEY_MAX_LEN);
     t->data = data;
     t->next = NULL;
     return t;

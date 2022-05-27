@@ -45,9 +45,17 @@ void setFlag(message *msg,uint16_t b){
     msg->flag |= (1 << b);
 }
 
+uint8_t reverse8(uint8_t b);
+
 //设置响应码
 void setRCODE(message *msg,uint16_t rcode){
-    msg->flag |= (rcode << 12);
+    // 下面这些代码属实无奈
+    // 当初没有注意flag
+    // 现在都反过来了
+    rcode = reverse8(rcode);
+    rcode <<= 8;
+    msg->flag |= rcode;
+//    msg->flag |= (rcode << 12);
 }
 
 //为报文添加一个问题

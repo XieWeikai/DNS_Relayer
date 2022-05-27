@@ -15,6 +15,7 @@
 #define A 1
 #define NS 2 //an authoritative name server
 #define CNAME 5 //the canonical name for an alias
+#define PTR 12 // a domain name pointer
 #define AAAA 28
 
 //class value

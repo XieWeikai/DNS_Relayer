@@ -5,12 +5,12 @@
 #ifndef DNS_HASH_H
 #define DNS_HASH_H
 
-#ifndef MAX_LEN
-#define MAX_LEN 32
+#ifndef HASH_KEY_MAX_LEN
+#define HASH_KEY_MAX_LEN 50
 #endif
 
 typedef struct node{
-    char name[MAX_LEN]; //键
+    char name[HASH_KEY_MAX_LEN+1]; //键
     void *data;         //值
     struct node *next;  //防冲突
 }Node;
