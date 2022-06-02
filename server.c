@@ -375,14 +375,14 @@ int main(int argc,char **argv) {
 
     int poolsize = getInt(argument,"poolsize");
     poolsize = poolsize == 0 ? 10 : poolsize;
-    poolsize = poolsize > 20 ? 20 : poolsize;
+    poolsize = poolsize > 150 ? 150 : poolsize;
 
     Pool tp = CreateThreadPool(poolsize);
     log_info("Created a threadpool.Size of threadpool:%d",poolsize);
     struct sockaddr_in cliAddr,global_addr;
     socklen_t cliLen;
 
-    char str[101];
+    char str[181];
 
     enum clog_level debugLev = CLOG_LEVEL_INFO;
     if(matchArg(argument,"debug","trace")){
