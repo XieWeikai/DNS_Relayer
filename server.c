@@ -115,14 +115,14 @@ void addRR2Item(item *it,RR *rr){
 
 // 取出 name:type中的缓存
 item *getItem(char *name,int type){
-    char key[51];
+    char key[501];
     calcKey(name,type,key);
     return CacheGet(globalCache,key);
 }
 
 // 将一个条目放入缓存中
 void putItem(char *name,int type,item *it){
-    char key[51];
+    char key[501];
     if(it->type == 0) // 无效的item
         return ;
     calcKey(name,type,key);
