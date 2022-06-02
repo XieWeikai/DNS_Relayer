@@ -61,6 +61,7 @@ if __name__ == '__main__':
     print_counter(Counter(st_l))
     print('------------------------------')
     print()
+    sleep(10)
 
     with mp.Pool(processes=100) as pool:
         print('----------50x Test----------')
@@ -72,6 +73,7 @@ if __name__ == '__main__':
         print_counter(Counter(st_l))
         print('------------------------------')
         print()
+        sleep(10)
 
         print('----------200x Test----------')
         n = 200
@@ -82,6 +84,7 @@ if __name__ == '__main__':
         print_counter(Counter(st_l))
         print('------------------------------')
         print()
+        sleep(10)
 
         print('----------500x Test----------')
         n = 500
@@ -92,16 +95,17 @@ if __name__ == '__main__':
         print_counter(Counter(st_l))
         print('------------------------------')
         print()
+        sleep(10)
 
-        print('----------1000x Test, sleep 1s per 100x----------')
-        n = 100
-        for i in range(10):
+        print('----------1000x Test, sleep 1s per 50x----------')
+        n = 50
+        for i in range(20):
             l += pool.starmap(domain_test,
                     zip([srv]*n, get_random_domain_list(n)))
             sleep(1)
         # print(*l, sep='\n') 
         st_l = [x[1] for x in l]
-        print('SUMMARY:', f'TOTAL {n*10}')
+        print('SUMMARY:', f'TOTAL {n*20}')
         print_counter(Counter(st_l))
         print('------------------------------')
         print()
