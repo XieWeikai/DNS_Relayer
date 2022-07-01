@@ -6,8 +6,6 @@
 #include <ctype.h>
 #include <string.h>
 #include <arpa/inet.h>
-#include <pthread.h>
-
 
 #define COMPRESS 1
 
@@ -24,18 +22,18 @@ message *newMsg(){
 
 // 设该message为query
 void setQuery(message *msg){
-    msg->flag &= ~1;
+    msg->flag &= ~(1 << 15);
 }
 
 // 设该message为响应
 void setResp(message *msg){
-    msg->flag |= 1;
+    msg->flag |= (1 << 15);
 }
 
 //设置操作码
 void setOpcode(message *msg,uint16_t op){
-    msg->flag &= ~(0xf << 1);
-    msg->flag |= (op << 1);
+    msg->flag &= ~(0xf << 11);
+    msg->flag |= (op << 11);
 }
 
 //设置某个标志位
@@ -45,17 +43,10 @@ void setFlag(message *msg,uint16_t b){
     msg->flag |= (1 << b);
 }
 
-uint8_t reverse8(uint8_t b);
-
 //设置响应码
 void setRCODE(message *msg,uint16_t rcode){
-    // 下面这些代码属实无奈
-    // 当初没有注意flag
-    // 现在都反过来了
-    rcode = reverse8(rcode);
-    rcode <<= 8;
+    msg->flag &= ~0xf;
     msg->flag |= rcode;
-//    msg->flag |= (rcode << 12);
 }
 
 //为报文添加一个问题
@@ -110,24 +101,11 @@ void releaseAdditionalRR(message *msg){
     msg->RR_count[ADDITIONAL] = 0;
 }
 
-//翻转8个bits 纯属为了离奇的标志位编的这段
-uint8_t reverse8(uint8_t b){
-    b = ( b & 0x55 ) << 1 | ( b & 0xAA ) >> 1;
-    b = ( b & 0x33 ) << 2 | ( b & 0xCC ) >> 2;
-    b = ( b & 0x0F ) << 4 | ( b & 0xF0 ) >> 4;
-    return b;
-}
-
 // 将报文头部写入buff
-ssize_t encodeHeader(message *msg,void *buff){
+static ssize_t encodeHeader(message *msg,void *buff){
     uint16_t *p = buff;
     *p ++ = htons(msg->ID);
-//    *p ++ = htons(msg->flag);
-// 这个标志位的顺序是真有够离谱，抓包看到的结果简直离奇
-// 颠来倒去的 ....... 补救一下，写一段离奇的代码
-    *(uint8_t *)p = reverse8(msg->flag & 0xff); p = (uint16_t *)((uint8_t *)p + 1);
-    *(uint8_t *)p = reverse8((msg->flag >> 8) & 0xff); p = (uint16_t *)((uint8_t *)p + 1);
-//离奇毕
+    *p ++ = htons(msg->flag);
     *p ++ = htons(msg->q_count);
     for(int i=0;i<3;i++)
         *p++ = htons(msg->RR_count[i]);
@@ -147,7 +125,7 @@ static uint16_t getPos(char *name,HashTab *ht){ // 辅助函数，查找名字�
 // 将一个字符串转化为指定的格式
 // 注：我的格式不使用压缩的方式  没压缩已经是过去式了，现在压缩了哦哈哈哈
 // 返回转化后的占用内存字节数
-ssize_t encodeName(char *name,void *buff,void *origin,HashTab *ht){
+static ssize_t encodeName(char *name,void *buff,void *origin,HashTab *ht){
     uint16_t pos,data;
     char *num = buff,*p = buff+1,*last_name = name;
     uint8_t cnt = 0;
@@ -203,7 +181,7 @@ ssize_t encodeQues(question *ques,void *buff,void *origin,HashTab *ht){
 }
 
 // 将资源记录编进报文 返回占用字节数
-ssize_t encodeRR(RR *rr,void *buff,void *origin,HashTab *ht){
+static ssize_t encodeRR(RR *rr,void *buff,void *origin,HashTab *ht){
     uint16_t *t = buff;
     ssize_t n = encodeName(rr->name,buff,origin,ht);
     t = (void *)t + n;
@@ -278,13 +256,9 @@ void *decodeName(void *buff,void *origin,char *name){
 // 将报文变为message结构体
 message *decode(void *buff){
     uint16_t *p = buff;
-    uint8_t *tmp;
     message *msg = newMsg();
     msg->ID = ntohs(*p++);
-    tmp = (uint8_t *)p;
-    msg->flag = (uint16_t)(reverse8(*tmp++) & 0xff);
-    msg->flag = msg->flag | (((int16_t)(reverse8(*tmp++)) & 0xff) << 8);
-    p = (uint16_t *)tmp;
+    msg->flag = ntohs(*p++);
     msg->q_count = ntohs(*p++);
     for(int i=0;i<3;i++)
         msg->RR_count[i] = ntohs(*p++);
@@ -354,7 +328,7 @@ void setQNAME(question *q,char *name){
     strncpy(q->q_name,name,MAX_LEN);
 }
 
-int check(int c){
+static int check(int c){
     char a[] = {"!@#$%^&*()_+-=,./?'\"\\"};
     if(isalnum(c))
         return 1;
@@ -364,8 +338,8 @@ int check(int c){
     return 0;
 }
 
-void showFlag(uint16_t flag){
-    for(int i = 0;i < 16;i++)
+static void showFlag(uint16_t flag){
+    for(int i = 15;i >= 0;i--)
         if((flag & (1 << i)) != 0)
             printf("1 ");
         else

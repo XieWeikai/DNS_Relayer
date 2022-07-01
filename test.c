@@ -211,17 +211,61 @@ void testQueue(){
 
 #include "arg.h"
 
+// 使用UDP将buff前size个字节发送到dst
+// 例: sentTo("lala",4,"192.168.43.1:80");
+void sentTo(void *buff,size_t size,char *dst){
+    char dstTmp[100];
+    int sock = Socket(AF_INET,SOCK_DGRAM,0);
+
+    struct sockaddr_in dstAddr;
+    bzero(&dstAddr, sizeof(dstAddr));
+    dstAddr.sin_family = AF_INET;
+
+    char *s;
+    strncpy(dstTmp,dst,100);
+    s = strtok(dstTmp,":");
+    dstAddr.sin_addr.s_addr = inet_addr(s);
+    s = strtok(NULL,":");
+    dstAddr.sin_port = htons((uint16_t)atoi(s));
+
+    sendto(sock,buff,size,0,(struct sockaddr*)&dstAddr,sizeof(dstAddr));
+
+    close(sock);
+
+}
+
 int main(int argc,char **argv){
 //    srand(time(NULL));
 //    testCache1();
 
-    Arg *arg = NewArg(argc,argv);
+//    Arg *arg = NewArg(argc,argv);
+//
+//    printf("check --help:%d\n", matchArg(arg, "--help", "true"));
+//    printf("num:%d\n",getInt(arg,"num"));
+//    printf("str:%s\n",getStr(arg,"str"));
+//
+//    DestroyArg(arg);
 
-    printf("check --help:%d\n", matchArg(arg, "--help", "true"));
-    printf("num:%d\n",getInt(arg,"num"));
-    printf("str:%s\n",getStr(arg,"str"));
+    message *msg = newMsg();
+    setResp(msg);
+    msg->ID = 0x1234;
+    setOpcode(msg,QUERY);
+    setFlag(msg,RD);
+    setFlag(msg,RA);
+    setRCODE(msg,NAME_ERR);
 
-    DestroyArg(arg);
+    question q;
+    setQNAME(&q,"www.baidu.com");
+    q.q_type = A;
+    q.q_class = IN;
+    addQuestion(msg,&q);
+
+    size_t n;
+    char buff[1024];
+    n = encode(msg,buff);
+    destroyMsg(msg);
+
+    sentTo(buff,n,"192.168.43.1:53");
 
     return 0;
 }

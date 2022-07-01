@@ -36,12 +36,12 @@
 #define NAME_ERR 3 //domain name referenced in the query does not exist.
 
 // flag
-#define AA 5 //Authoritative Answer
-#define TC 6 //TrunCation
-#define RD 7 // Recursion Desired
-#define RA 8 //Recursion Available
-#define AD 10 //1 为应答服务器已经验证了该查询相关的 DNSSEC 数字签名 (RFC1035中没有)抓包看到的，网上查到的
-#define CD 11 //1 为服务器并未进行相关 DNSSEC 数字签名的验证       (RFC1035中没有)抓包看到的，网上查到的
+#define AA 10 //Authoritative Answer
+#define TC 9 //TrunCation
+#define RD 8 // Recursion Desired
+#define RA 7 //Recursion Available
+#define AD 5 //1 为应答服务器已经验证了该查询相关的 DNSSEC 数字签名 (RFC1035中没有)抓包看到的，网上查到的
+#define CD 4 //1 为服务器并未进行相关 DNSSEC 数字签名的验证       (RFC1035中没有)抓包看到的，网上查到的
 
 // RR section
 #define ANSWER 0
@@ -132,7 +132,7 @@ int addRR(message *msg,RR *q,int type);
 //释放一条message结构占用的空间
 void destroyMsg(message *msg);
 
-// 去除一段报文中的Additionail段
+// 去除一段报文中的Additional段
 void releaseAdditionalRR(message *msg);
 
 //将msg结构编码为可以实际发送的报文
