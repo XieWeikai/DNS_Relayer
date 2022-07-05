@@ -24,7 +24,7 @@ add_executable(cli
         cli.c ${TOOL} ${CACHE} ${MES})
 
 add_executable(test
-        test.c ${TOOL} ${MES} ${CACHE} ${POOL})
+        test/test.c ${TOOL} ${MES} ${CACHE} ${POOL})
 
 target_link_libraries(relayer PUBLIC pthread)
 target_link_libraries(server PUBLIC pthread)
