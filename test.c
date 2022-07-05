@@ -177,14 +177,14 @@ void producer(void *arg){
     printf("get into producer\n");
     safequeue q = arg;
     int *p;
-    for(int i=0;i <= 1000;i++){
+    for(int i=0;i <= 10000;i++){
         p = malloc(sizeof(int));
         *p = i;
         SafeEnque(q,p);
     }
-    sleep(5);
-    SafeDestroy(q);
-    printf("get out of consumer\n");
+    sleep(3);
+    SafeClose(q);
+    printf("get out of producer\n");
 }
 
 void consumer(void *arg){
@@ -192,20 +192,29 @@ void consumer(void *arg){
     safequeue q = arg;
     int *p;
     while ((p = SafeDeque(q)) != NULL){
-        printf("%d\n",(*p)*(*p));
+        printf("receice:%d\n",*p);
         free(p);
     }
     printf("get out of consumer\n");
 }
 
 void testQueue(){
-    Pool p = CreateThreadPool(3);
+    Pool p = CreateThreadPool(15);
     safequeue q = NewSafeQueue();
+    AddTask(p,consumer,q);
+    AddTask(p,consumer,q);
+    AddTask(p,consumer,q);
+    AddTask(p,consumer,q);
+    AddTask(p,consumer,q);
+    AddTask(p,consumer,q);
+    AddTask(p,consumer,q);
+    AddTask(p,consumer,q);
     AddTask(p,consumer,q);
     AddTask(p,producer,q);
     sleep(1);
+    printf("after sleep\n");
     ClosePool(p);
-    free(q);
+    SafeDestroy(q);
     printf("close pool\n");
 }
 
@@ -246,26 +255,28 @@ int main(int argc,char **argv){
 //
 //    DestroyArg(arg);
 
-    message *msg = newMsg();
-    setResp(msg);
-    msg->ID = 0x1234;
-    setOpcode(msg,QUERY);
-    setFlag(msg,RD);
-    setFlag(msg,RA);
-    setRCODE(msg,NAME_ERR);
 
-    question q;
-    setQNAME(&q,"www.baidu.com");
-    q.q_type = A;
-    q.q_class = IN;
-    addQuestion(msg,&q);
+//    message *msg = newMsg();
+//    setResp(msg);
+//    msg->ID = 0x1234;
+//    setOpcode(msg,QUERY);
+//    setFlag(msg,RD);
+//    setFlag(msg,RA);
+//    setRCODE(msg,NAME_ERR);
 
-    size_t n;
-    char buff[1024];
-    n = encode(msg,buff);
-    destroyMsg(msg);
+//    question q;
+//    setQNAME(&q,"www.baidu.com");
+//    q.q_type = A;
+//    q.q_class = IN;
+//    addQuestion(msg,&q);
+//
+//    size_t n;
+//    char buff[1024];
+//    n = encode(msg,buff);
+//    destroyMsg(msg);
+//
+//    sentTo(buff,n,"192.168.43.1:53");
 
-    sentTo(buff,n,"192.168.43.1:53");
-
+    testQueue();
     return 0;
 }
