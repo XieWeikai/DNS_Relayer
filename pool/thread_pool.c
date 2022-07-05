@@ -38,12 +38,8 @@ ThreadPool *CreateThreadPool(int num){
     pool->ids = calloc(num,sizeof(pthread_t));
     pool->num = num;
     pthread_t tid;
-    //pthread_attr_t attr;
+
     for(int i=0;i<num;i++) {
-        //pthread_attr_init(&attr);
-        //pthread_attr_setdetachstate(&attr, 1); // 设置这个属性的线性不需要join 若用默认属性，则不join的线程的资源不会被回收也就是内存泄漏 线程池中的线程不需要join
-        //pthread_create(&tid, &attr, worker, pool->q);
-        //pthread_attr_destroy(&attr);
         pthread_create(&tid,NULL,worker,pool->q); // 还是创建需要join的线程吧，ClosePool时等待所有线程退出
         pool->ids[i] = tid;
     }
@@ -60,10 +56,10 @@ void AddTask(ThreadPool *pool,void (*func)(void *),void *data){
 
 // 关闭线程池
 void ClosePool(ThreadPool *pool){
-    SafeDestroy(pool->q);  // 摧毁任务队列 工作线程会开始结束
+    SafeClose(pool->q);  // 摧毁任务队列 工作线程会开始结束
     for(int i=0;i<pool->num;i++)
         pthread_join(pool->ids[i],NULL); // 等待工作线程退出
     free(pool->ids);
-    free(pool->q);
+    SafeDestroy(pool->q);
     free(pool);
 }

@@ -17,7 +17,15 @@ void SafeEnque(safequeue q, void *data);
 // 出队
 void *SafeDeque(safequeue q);
 
-// 销毁队列
+// 关闭该队列
+// 释放一部分资源
+// 关闭后依旧可以进行SafeEnque SafeDeque
+// 但不会有任何效果
+void SafeClose(safequeue q);
+
+// 销毁队列，彻底释放掉该队列的全部占用资源
+// 此后不得再对该队列有任何操作
+// 否则会操作错误的内存
 void SafeDestroy(safequeue q);
 
 // 线程池指针
