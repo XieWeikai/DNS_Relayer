@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     print('----------Basic Test----------')
     n = 10
-    l = map(domain_test, [srv]*n, get_random_domain_list(n))
+    l = list(map(domain_test, [srv]*n, get_random_domain_list(n)))
     print(*l, sep='\n') 
     st_l = [x[1] for x in l]
     print('SUMMARY:', f'TOTAL {n}')
