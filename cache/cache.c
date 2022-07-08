@@ -23,7 +23,6 @@ Cache *CreateCache(int maxSize,void *(*copy)(void *data),void (*delete)(void *da
     c->hTab = NewHashTab();
     c->lList = NewLinkList();
     pthread_rwlock_init(&c->mux,NULL);
-//    pthread_mutex_init(&c->mu,NULL);
     c->maxSize = maxSize;
     c->len = 0;
     c->copy = copy;

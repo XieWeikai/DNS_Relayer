@@ -17,11 +17,11 @@ options:
         level can be one of trace,debug,info,warn,error and fatal.Default level is info.
 
     poolsize=num_of_thread_pool
-        Set the size of thread pool. Default size is 10.Size should not be more than 20.
+        Set the size of thread pool. Default size is 10.Size should not be more than 150.
 
 
     cachesize=size
-        Set the size of cache, Default is 1024. Size should not be more than 2048.
+        Set the size of cache, Default is 1024.si
 
     port=portnumber
         Set the listening port number to portnumber. Default is 53.

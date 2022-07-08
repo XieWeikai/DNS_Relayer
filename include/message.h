@@ -77,15 +77,9 @@ typedef struct msg{
     uint16_t flag;
     uint16_t q_count;
     uint16_t RR_count[3]; // RR_count[ANSWER]代表answer段数量 以此类推
-//    uint16_t ans_count;
-//    uint16_t auth_count;
-//    uint16_t add_count;
 
     question *ques[MAX_SIZE];
     RR *resourse_record[3][MAX_SIZE]; // resourse_record[ANSWER]代表answer段，以此类推
-//    RR *ans[MAX_SIZE];
-//    RR *auth[MAX_SIZE];
-//    RR *add[MAX_SIZE];
 }message;
 
 //创建新报文

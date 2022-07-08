@@ -21,14 +21,11 @@
 
 #include "arg.h"
 
-#define DEBUG 0
-
 #define STR_LEN 128
 #define MAX_NUM 10
 
 
 typedef struct {
-//    message *msg;
     char buff[1024]; // 接收到的请求报文
     size_t n;  // 请求报文的长度
     struct sockaddr_in cliAddr;
@@ -161,26 +158,17 @@ void showRequest(message *msg,enum clog_level level){
     typename[PTR] = "PTR";
     char *p = typename[msg->ques[0]->q_type];
     clog_log(level,"request for:%s type:%s",msg->ques[0]->q_name,p==NULL?"???":p);
-//    log_info("request for:%s type:%s",msg->ques[0]->q_name,typename[msg->ques[0]->q_type]);
 }
-
-void tmpSend(void *buff,size_t n); // debug函数
 
 void handler(void *ar) {
     char buff[1024];
-    int n, needSearch = false;
+    int n;
     arg *parg = ar;
     message *replyMsg = decode(parg->buff); // 要回复的msg
     releaseAdditionalRR(replyMsg); //把额外的段删去，不知为啥dig的请求中有时会带有additional段
     setResp(replyMsg); // 设置为响应报文
     setFlag(replyMsg,RA); // 设置flag
     showRequest(replyMsg,CLOG_LEVEL_INFO);
-
-#if DEBUG
-    log_debug("-----request-----");
-    showMsg(replyMsg);
-    log_debug("-----end of request------");
-#endif
 
     char name[STR_LEN];
     strncpy(name,replyMsg->ques[0]->q_name,STR_LEN); // name放着将查询的域名字符串
@@ -192,11 +180,6 @@ void handler(void *ar) {
         it = getItem(name,qtype);
         if(it != NULL){ // 直接就查到了
             Item2Msg(replyMsg,it,it->name);
-#if DEBUG
-            log_debug("-----------------");
-            checkItem(it);
-            log_debug("-----------------");
-#endif
             free(it);
             n = encode(replyMsg,buff);
             sendto(globalSocket,buff,n,0,(struct sockaddr*)(&parg->cliAddr), sizeof(parg->cliAddr));
@@ -211,23 +194,9 @@ void handler(void *ar) {
                 if(tit != NULL){ // 找到了，完美
                     Item2Msg(replyMsg,it,it->name);
                     Item2Msg(replyMsg,tit,tit->name);
-#if DEBUG
-                    log_debug("-----------------");
-                    checkItem(it);
-                    log_debug("-----------------");
-                    checkItem(tit);
-                    log_debug("-----------------");
-
-#endif
                     free(it);
                     free(tit);
-
                     n = encode(replyMsg,buff);
-#if DEBUG
-                    tmpSend(buff,n);
-                    showMsg(replyMsg);
-                    showMem(buff,n);
-#endif
                     sendto(globalSocket,buff,n,0,(struct sockaddr*)(&parg->cliAddr), sizeof(parg->cliAddr));
                     log_info("get CNAME and A resource record in cache and respon to client !\n");
                     destroyMsg(replyMsg);
@@ -238,6 +207,7 @@ void handler(void *ar) {
             }
         }
     }
+    // --------------------------------------------------------------
     // 以上是从缓存查找资源记录的过程
     // 接下来尝试在文件中查找A记录
     char ip[17];
@@ -267,7 +237,7 @@ void handler(void *ar) {
             return ;
         }
     }
-
+    // ---------------------------------------------------------------------------
     //接下来开始中继功能
     //创建socket发送请求
     int sockfd;
@@ -333,37 +303,37 @@ void handler(void *ar) {
     putItem(Cit.name,Cit.type,&Cit);
 }
 
-void tmpSend(void *buff,size_t n){
-    log_debug("started tmpSend");
-    //创建socket发送请求
-    struct sockaddr_in servaddr;
-    int sockfd;
-    socklen_t servaddr_len;
-
-    sockfd = Socket(AF_INET,SOCK_DGRAM,0); // 创建socket
-    // 设置服务器ip+端口
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(53);
-    if(!(inet_pton(AF_INET, "192.168.43.1", &servaddr.sin_addr))){
-        fprintf(stderr,"error occur when parsing dns server ip:%s\n","192.168.43.1");
-        exit(-1);
-    }
-    // 向服务器发送信息
-    sendto(sockfd,buff,n,0,(struct sockaddr*)&servaddr,sizeof(servaddr));
-
-    log_debug("send to server");
-    close(sockfd);
-}
-
 void showHelp(){
-    FILE *fp = fopen("./man.txt","r");
-    if(fp == NULL) {
-        fprintf(stderr, "error:fail to open man.txt.can not show mannuals\nplease check if man.txt exists!\n");
-        return;
-    }
-    int ch;
-    while((ch = getc(fp)) != EOF)
-        putchar(ch);
+    printf("usage:\n"
+           "    server localfile=filename dns=local_dns_server_ip [options]\n"
+           "\n"
+           "    local_dns_server_ip is ip of your Local DNS server.When our program work as a relayer,it will send\n"
+           "    message to the local_dns_server_ip.\n"
+           "\n"
+           "    filename is the file that stores a series of domain names and their ipv4 addresses.Each line is in\n"
+           "    the form of: ip domain name.\n"
+           "    e.g.  dnsrelay.txt\n"
+           "    ...\n"
+           "    74.125.207.113 i2.ytimg.com\n"
+           "    74.125.207.113 i3.ytimg.com\n"
+           "    ...\n"
+           "\n"
+           "options:\n"
+           "    debug=level\n"
+           "        level can be one of trace,debug,info,warn,error and fatal.Default level is info.\n"
+           "\n"
+           "    poolsize=num_of_thread_pool\n"
+           "        Set the size of thread pool. Default size is 10.Size should not be more than 150.\n"
+           "\n"
+           "\n"
+           "    cachesize=size\n"
+           "        Set the size of cache, Default is 1024.\n"
+           "\n"
+           "    port=portnumber\n"
+           "        Set the listening port number to portnumber. Default is 53.\n"
+           "\n"
+           "    --help\n"
+           "        Show this content.");
 }
 
 int main(int argc,char **argv) {

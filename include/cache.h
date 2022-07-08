@@ -16,7 +16,6 @@ typedef struct cache {
     int len; // 已经存入的个数
     int maxSize; // 最大缓存个数
     pthread_rwlock_t mux; // 多读单写锁
-//    pthread_mutex_t mu; // 防止取操作中多次删除某个超出TTL的缓存  好吧这里有点怪了
 
     void *(*copy)(void *data); // 复制函数，用于复制一份要存入的数据
     void (*delete)(void *data); // 销毁函数，用于销毁一份存入的数据

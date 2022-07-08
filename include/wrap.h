@@ -1,7 +1,3 @@
-//
-// Created by 谢卫凯 on 2022/4/1.
-//
-
 #ifndef DNS_WRAP_H
 #define DNS_WRAP_H
 
