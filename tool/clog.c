@@ -25,16 +25,21 @@ static struct {
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void clog_log(enum clog_level level, const char *format, ...) {
-    pthread_mutex_lock(&log_mutex);
-    if (!log_state.quiet && level >= log_state.level) {
-        fprintf(stderr, "%s%-5s%s ", level_colors[level], log_level_str[level], color_reset);
-        va_list args;
-        va_start(args, format);
-        vfprintf(stderr, format, args);
-        va_end(args);
-        fprintf(stderr, "\n");
-        fflush(stderr);
+    if (level < log_state.level) {
+        return;
     }
+    if (log_state.quiet) {
+        return;
+    }
+
+    pthread_mutex_lock(&log_mutex);
+    fprintf(stderr, "%s%-5s%s ", level_colors[level], log_level_str[level], color_reset);
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fprintf(stderr, "\n");
+    fflush(stderr);
     pthread_mutex_unlock(&log_mutex);
 }
 
