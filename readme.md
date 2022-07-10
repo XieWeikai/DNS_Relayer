@@ -1314,7 +1314,40 @@ void *CacheGet(Cache *c, char *key);
 
 #### 命令行参数解析
 
-本程序的命令行参数采用`key=value`这样的形式，这种形式很容易使用哈希表来处理。在源码`tool/arg.c`和`include/arg.h`中使用哈希表封装了一些简单的解析命令行参数的功能。详细使用方式见`doc/Arg.md`。
+本程序的命令行参数采用`key=value`这样的形式，这种形式很容易使用哈希表来处理。在源码`tool/arg.c`和`include/arg.h`中使用哈希表封装了一些简单的解析命令行参数的功能。封装了哈希表的结构如下:
+
+```c
+typedef struct {
+    HashTab *ht;
+}Arg;
+```
+
+解析和获取命令行参数的相关功能均在`tool/arg.c`中实现，其接口如下
+
+```c
+// 依据命令行参数创建一个Arg并返回指向其的指针
+// 处理命令行参数
+// 命令行参数形如 debug=info dns=192.168.43.1 这样的key=value对
+// 也可以是单独的 key 如 
+// ./server help 这种写法等于 ./server help=true
+Arg *NewArg(int argc,char **argv);
+
+// 销毁Arg
+void DestroyArg(Arg *arg);
+
+// 根据key 返回 value字符串
+char *getStr(Arg *arg,char *key);
+
+// 根据key 返回value对应的int数
+// 如命令行参数中若有 size=10
+// 则getInt(arg,"size")返回10
+int getInt(Arg *arg,char *key);
+
+// 测试某个key对应的value是否和参数value一致
+// 比如命令行参数为 debug=info
+// 则match("debug","info")返回true
+int matchArg(Arg *arg, char *key, char *value);
+```
 
 #### 对socket编程相关函数的包装
 
