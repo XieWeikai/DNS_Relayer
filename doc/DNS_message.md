@@ -88,12 +88,12 @@ setOpcode(msg,QUERY);
 
 ```c
 // flag
-#define AA 5 //Authoritative Answer
-#define TC 6 //TrunCation
-#define RD 7 // Recursion Desired
-#define RA 8 //Recursion Available
-#define AD 10 //1 为应答服务器已经验证了该查询相关的 DNSSEC 数字签名 (RFC1035中没有)抓包看到的，网上查到的
-#define CD 11 //1 为服务器并未进行相关 DNSSEC 数字签名的验证       (RFC1035中没有)抓包看到的，网上查到的
+#define AA 10 //Authoritative Answer
+#define TC 9 //TrunCation
+#define RD 8 // Recursion Desired
+#define RA 7 //Recursion Available
+#define AD 5 //1 为应答服务器已经验证了该查询相关的 DNSSEC 数字签名 (RFC1035中没有)抓包看到的，网上查到的
+#define CD 4 //1 为服务器并未进行相关 DNSSEC 数字签名的验证       (RFC1035中没有)抓包看到的，网上查到的
 
 //设置某个标志位
 //如要设置AA位，则这样调用  setFlag(msg,AA)

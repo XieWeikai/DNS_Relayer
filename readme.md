@@ -655,6 +655,8 @@ DNS的总体设计如下图描述
 
 ### 报文解析和构造
 
+#### 结构设计
+
 *(报文解析和构造相关的源码见`message/message.c`和`include/message.h`)*
 
 报文头部格式如下（摘自RFC1035）
@@ -760,7 +762,38 @@ message *decode(void *buff);
 
 其中`encode`函数用于将`message`结构体变为实际可发送的DNS报文，该函数会将结构体中各个字段以符合DNS报文格式的方式填入buff中，对于question中的name、resource record中的name、RDATA中的字符串数据，该函数可以按照RFC中的规定进行压缩(使用了一个哈希表记录已经填入的各个字符串的位置信息)。`decode`函数则将一个DNS报文转换为`message`类型的结构体。
 
-为了方便构造`message`结构体，`message.c`中还提供了很多相关的辅助函数以供调用，现罗列如下
+#### 使用方法
+
+##### 构造报文
+
+创建和销毁报文的函数声明如下
+
+```c
+// 创建新报文
+// 即初始化一个message结构并返回
+// 无内容
+message *newMsg();
+
+//释放一条message结构占用的空间
+//对任意的message结构，使用完后都应该用此函数示范所有占用的空间
+void destroyMsg(message *msg);
+```
+
+设置报文是请求报文或响应报文使用如下函数
+
+```c
+//设置报文为请求报文
+void setQuery(message *msg);
+
+//设置报文为响应报文
+void setResp(message *msg);
+
+// 下面是例子
+setQuery(msg); // 将msg报文设为请求报文
+setResp(msg);  // 将msg报文设为响应报文
+```
+
+设置报头中的opcode相关函数和宏如下(基本上都是设为QUERY的，其他的课程设计也用不到)
 
 ```c
 //opcode
@@ -768,12 +801,16 @@ message *decode(void *buff);
 #define IQUERY 1  //an inverse query (IQUERY)
 #define STATUS 2  //a server status request (STATUS)
 
-//Rcode
-#define NO_ERR 0 // no error
-#define FMT_ERR 1 //Format error - The name server wasunable to interpret the query.
-#define SERVER_FAILURE 2  //Server failure - The name server was unable to process this query due to a problem with the name server.
-#define NAME_ERR 3 //domain name referenced in the query does not exist.
+//设置操作码
+void setOpcode(message *msg,uint16_t op);
 
+// 示例 设置请求为标准请求
+setOpcode(msg,QUERY);
+```
+
+设置其他一些标志位的相关函数和宏如下
+
+```c
 // flag
 #define AA 10 //Authoritative Answer
 #define TC 9 //TrunCation
@@ -782,55 +819,148 @@ message *decode(void *buff);
 #define AD 5 //1 为应答服务器已经验证了该查询相关的 DNSSEC 数字签名 (RFC1035中没有)抓包看到的，网上查到的
 #define CD 4 //1 为服务器并未进行相关 DNSSEC 数字签名的验证       (RFC1035中没有)抓包看到的，网上查到的
 
-//创建新报文
-message *newMsg();
-
-//设置报文为请求报文
-void setQuery(message *msg);
-
-//设置报文为响应报文
-void setResp(message *msg);
-
-//设置操作码
-void setOpcode(message *msg,uint16_t op);
-
 //设置某个标志位
 //如要设置AA位，则这样调用  setFlag(msg,AA)
-//相应的宏已经预先写好 包括 AA TC RD RA
+//相应的宏已经预先写好 包括 AA TC RD RA AD CD
 void setFlag(message *msg,uint16_t b);
+```
+
+设置响应码`RCODE`的相关函数和宏如下
+
+```c
+//Rcode
+#define NO_ERR 0 // no error
+#define FMT_ERR 1 //Format error - The name server wasunable to interpret the query.
+#define SERVER_FAILURE 2  //Server failure - The name server was unable to process this query due to a problem with the name server.
+#define NAME_ERR 3 //domain name referenced in the query does not exist.
 
 //设置响应码
 void setRCODE(message *msg,uint16_t rcode);
 
+// 示例 设置响应
+setRCODE(msg,NAME_ERR); // 查无此名
+```
+
+以上就是构造报头相关的函数和宏，报头中的`QDCOUNT`、`ANCOUNT`、`NSCOUNT`、`ARCOUNT`不需要自己设置，在添加相关字段时会自动设置。
+
+除了设置报文头部相关字段，该模块还实现了设置question、answer、authority、additional段的函数。
+
+设置qustion中字段的方式如下
+
+```c
+//type value
+#define A 1
+#define NS 2 //an authoritative name server
+#define CNAME 5 //the canonical name for an alias
+#define AAAA 28
+// 以上是目前支持的资源类型
+
+//class value
+#define IN 1 //the Internet
+#define CS 2 // the CSNET class (Obsolete - used only for examples in some obsolete RFCs)
+#define CH 3 // the CHAOS class
+#define HS 4 // Hesiod [Dyer 87]
+
 //设置QNAME
 void setQNAME(question *q,char *name);
 
+// 示例 构建请求www.baidu.com A类型资源的question
+question q;
+setQNAME(&q,"www.baidu.com");
+q.q_type = A ; // A类型请求
+q.q_class = IN; //一般来说都是IN 其他类型不会碰到的
+```
+
+设置好question后，将该question添加到message中的方法如下
+
+```c
 //为报文添加一个问题
 //失败返回0
 int addQuestion(message *msg,question *q);
 
+// 示例 
+message *msg = newMsg();
+...  //构造msg的首部
+question q;
+...  // 设置q的内容
+addQuestion(msg,&q);// 将该问题添加到msg报文中
+```
+
+除了对question的处理，该模块还能对resource record进行处理，设置resource record的方法如下
+
+```c
 //设置RR的name字段
 void setRRName(RR *rr,char *s);
 
 //设置RR的data字段为字符串
+//如CNAME、NS之类的记录用该函数设置
 void setRRNameData(RR *rr,char *name);
 
 //设置RR的data字段 二进制数据
 void setRRData(RR *rr,void *data,size_t size);
+// name和data一定要用上面几个函数设置，千万不要直接修改结构体成员
+
+// 其余的字段type class TTL 直接赋值即可 如
+RR r;
+r.type = CNAME;
+r.class = IN;
+r.TTL = 4000;
+```
+
+向message中添加resourse record的方法如下
+
+```c
+// RR section
+#define ANSWER 0
+#define AUTHORITY 1
+#define ADDITIONAL 2
 
 // 添加一条资源记录
 // 可以选择添加到 ANSWER AUTHORITY ADDITIONAL中的一段，由第三个参数标识
 // 如可以这样用 addRR(msg,q,ANSWER)
 int addRR(message *msg,RR *q,int type);
 
-//释放一条message结构占用的空间
-void destroyMsg(message *msg);
-
-// 去除一段报文中的Additional段
-void releaseAdditionalRR(message *msg);
+// 示例：向answer section 添加一条RR
+message *msg = newMsg();
+...//构造msg其他字段
+RR r;
+r.type = CNAME;
+r.class = IN;
+r.TTL = 4000;
+setRRName(&r,"www.baidu.com");
+setRRNameData(&r,"shifen.hahalala.wawa.ii");
+addRR(msg,&r,ANSWER);
 ```
 
-以上各个函数的功能和使用方法详见`doc/DNS_message.md`文档。
+使用上述介绍的函数设置好message结构后，可以使用如下函数将message变为实际可发送的报文
+
+```c
+//将msg结构编码为可以实际发送的报文
+//注意给够buff的长度
+//否则会段错误，这里为了方便默认buff长度足够
+//返回报文的长度 出错则返回-1
+ssize_t encode(message *msg,void *buff);
+
+//示例
+char buff[1024];
+ssize_t n;
+message *msg = newMsg();
+... // 设置msg中各个部分内容
+n = encode(msg,buff);  // 若函数成功执行，则buff中即为可发送的DNS报文 n为报文长度
+```
+
+##### 解析报文
+
+接收到一个DNS报文后，将其解析为message结构的方法如下
+
+```c
+//将收到的报文buff变为结构体
+message *decode(void *buff);
+
+char buff[1024];
+... // 接收DNS报文，装在buff中
+message *msg = decode(buff);  // 创建一个message结构，解析buff，填写好各个字段并返回指向message的指针
+```
 
 ### 线程池
 
@@ -932,9 +1062,91 @@ typedef struct threadpool{
 }ThreadPool;
 ```
 
+以上便是对线程池设计实现的简要描述。
 
+#### 线程池的使用
 
-以上便是对线程池设计实现的简要描述，线程池对外暴露的接口和使用方法详见`doc/Thread_pool.md`文档。
+线程池对外仅简单暴露如下几个接口
+
+```c
+// 线程池指针
+typedef struct threadpool *Pool;
+
+// 创建一个有num个线程的线程池
+Pool CreateThreadPool(int num);
+
+// 添加一个任务交给线程池来做
+// func为要执行的函数
+// data为要传给func的参数
+void AddTask(Pool pool,void (*func)(void *),void *data);
+
+// 关闭线程池
+void ClosePool(Pool pool);
+```
+
+一个简单的示例如下
+
+```c
+#include <stdio.h>
+#include <unistd.h>
+
+#include "thread_pool.h"
+
+void func1(void *data){
+    for(int i=0;i<5;i++) {
+        printf("func1 !!!\n");
+        sleep(1);
+    }
+}
+
+void func2(void *data){
+    for(int i=0;i<5;i++) {
+        printf("func2 !!!\n");
+        sleep(1);
+    }
+}
+
+void func3(void *data){
+    for(int i=0;i<3;i++) {
+        printf("func3 !!!\n");
+        sleep(1);
+    }
+}
+
+int main(){
+    Pool p = CreateThreadPool(2); // 两个线程的线程池
+    AddTask(p,func1,NULL);
+    AddTask(p,func2,NULL);
+    AddTask(p,func3,NULL);
+
+    // ClosePool会清除任务队列，等待已有线程执行完现在的任务后退出
+    //此处防止ClosePool清理调放入的任务
+    sleep(8); 
+  
+    ClosePool(p);
+    return 0;
+}
+```
+
+输出如下
+
+```bash
+func2 !!!
+func1 !!!
+func1 !!!
+func2 !!!
+func1 !!!
+func2 !!!
+func2 !!!
+func1 !!!
+func2 !!!
+func1 !!!
+func3 !!!
+func3 !!!
+func3 !!!
+```
+
+可以看到`func3`等到了最后才执行，这是因为线程池中只有两个线程，得先执行完一个任务才能空出线程池接着执行`func3`。
 
 ---
 
