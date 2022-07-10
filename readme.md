@@ -1304,9 +1304,101 @@ void CachePut(Cache *c, char *key, void *data, size_t size, time_t TTL);
 void *CacheGet(Cache *c, char *key);
 ```
 
-### 读取文件
+### 本地文件读取
+
+*（该部分代码见 `tool/file_reader.c`、`include/file_reader.h`）*
+
+本模块的目的是实现对本地配置文件的快速读取.
+
+对外接口如下:
+
+```c
+struct file_reader *file_reader_alloc(const char *file_name);
+
+void file_reader_free(struct file_reader *fr);
+
+char *file_reader_get_a_record(struct file_reader *fr, char *domain, char *ip);
+```
+
+其中 `file_reader_get_a_record` 函数实现了通过域名查询 IP 的功能.
+
+具体实现是建立了域名-本地文件记录位置的索引, 也就是:
+
+```c
+struct file_reader {
+    FILE *fd;
+    HashTab *item_index;
+};
+```
+
+建立索引的过程如下:
+
+```c
+static void file_reader_indexing(struct file_reader *fr) {
+    char ip[16], domain[512];
+    long cur;
+    fseek(fr->fd, 0, SEEK_SET);
+    while(cur = ftell(fr->fd), fscanf(fr->fd, "%s %s", ip, domain) != EOF) {
+        insert(fr->item_index, domain, &cur, sizeof(cur));
+    }
+}
+```
+
+读取时通过哈希表获取该条记录位置并读出, 若该条记录不匹配则重新索引文件, 若匹配则返回 IP:
+
+```c
+char *file_reader_get_a_record(struct file_reader *fr, char *domain, char *ip) {
+    long *pcur = search(fr->item_index, domain);
+    if (pcur == NULL) {
+        return NULL;
+    }
+
+    char tdomain[512];
+    fseek(fr->fd, *pcur, SEEK_SET);
+    fscanf(fr->fd, "%s %s", ip, tdomain);
+
+    if (strcmp(domain, tdomain) != 0) {
+        file_reader_indexing(fr);
+        return NULL;
+    }
+
+    return ip;
+}
+```
 
 ### 日志
+
+*（该部分代码见 `tool/clog.c`、`include/clog.h`）*
+
+该模块主要目的是提供简易, 可控的日志输出, 提供按等级屏蔽日志等功能.
+
+对外提供了 7 个日志宏:
+
+```c
+#define log_trace(...) clog_log(CLOG_LEVEL_TRACE, __VA_ARGS__)
+#define log_debug(...) clog_log(CLOG_LEVEL_DEBUG, __VA_ARGS__)
+#define log_info(...)  clog_log(CLOG_LEVEL_INFO, __VA_ARGS__)
+#define log_warn(...)  clog_log(CLOG_LEVEL_WARN, __VA_ARGS__)
+#define log_error(...) clog_log(CLOG_LEVEL_ERROR, __VA_ARGS__)
+#define log_fatal(...) clog_log(CLOG_LEVEL_FATAL, __VA_ARGS__)
+
+#define log_check(expr, ...)        \
+    do {                            \
+        if (!(expr)) {              \
+            log_fatal(__VA_ARGS__); \
+            exit(1);                \
+        }                           \
+    } while (0)
+```
+
+前 6 个宏提供了不同级别的日志, `log_check` 宏实现了断言功能.
+
+还提供了 2 个操纵日志模块状态的函数: 
+
+```c
+void clog_set_level(enum clog_level level);
+void clog_set_quiet(bool quiet);
+```
 
 ### 其余工具
 
@@ -1427,7 +1519,15 @@ typedef struct {
 
 ---
 
-## 压力测试
+## 并发测试
+
+使用 Python 脚本 `test/dns_test.py` 测试, 主要使用到了 `dnspython` 这个库. 测试的域名均为随机生成, 仅为了测试程序在高并发下的稳定性. 一轮测试分为五个小测试, 分别为基础测试 (顺序解析 10 个域名), 50x 并发测试, 200x 并发测试, 500x 并发测试和 1000x 并发测试 (每解析 50 个域名休息 10s). 每个小测试后均会生成总结.
+
+先启动本地的 DNS 中继器, 参数为 `localfile=../dnsrelay.txt dns=8.8.8.8 poolsize=100 debug=fatal`. 再通过 `dns_test_compare.sh` 脚本生成对本地 DNS 中继器和 Google DNS 服务器的并发测试, 并对比结果.
+
+![test_result](doc/img/test_result.png)
+
+运行结束后本地的 DNS 中继器仍运行良好, 没有崩溃或内存泄露等状况. 同时通过文件对比可以看到结果几乎一致 (第 5 行仅 ANSWER 的顺序不同). 说明程序对高并发有良好的处理.
 
 ## 总结
 
@@ -3269,16 +3369,21 @@ static struct {
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void clog_log(enum clog_level level, const char *format, ...) {
-    pthread_mutex_lock(&log_mutex);
-    if (!log_state.quiet && level >= log_state.level) {
-        fprintf(stderr, "%s%-5s%s ", level_colors[level], log_level_str[level], color_reset);
-        va_list args;
-        va_start(args, format);
-        vfprintf(stderr, format, args);
-        va_end(args);
-        fprintf(stderr, "\n");
-        fflush(stderr);
+    if (level < log_state.level) {
+        return;
     }
+    if (log_state.quiet) {
+        return;
+    }
+
+    pthread_mutex_lock(&log_mutex);
+    fprintf(stderr, "%s%-5s%s ", level_colors[level], log_level_str[level], color_reset);
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fprintf(stderr, "\n");
+    fflush(stderr);
     pthread_mutex_unlock(&log_mutex);
 }
 
@@ -3291,7 +3396,7 @@ void clog_set_quiet(bool quiet) {
 }
 ```
 
-### 读取本地文件
+### 本地文件读取
 
 #### file_reader.h
 
@@ -3319,17 +3424,17 @@ char *file_reader_get_a_record(struct file_reader *fr, char *domain, char *ip);
 ```c
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 
 #include "file_reader.h"
 #include "clog.h"
 #include "hash.h"
 
-static void file_reader_index(struct file_reader *fr) {
+static void file_reader_indexing(struct file_reader *fr) {
     char ip[16], domain[512];
     long cur;
-    while(cur = ftell(fr->fd), fscanf(fr->fd, "%s %s\n", ip, domain) != EOF) {
-        insert(fr->item_index, domain, &cur, sizeof cur);
+    fseek(fr->fd, 0, SEEK_SET);
+    while(cur = ftell(fr->fd), fscanf(fr->fd, "%s %s", ip, domain) != EOF) {
+        insert(fr->item_index, domain, &cur, sizeof(cur));
     }
 }
 
@@ -3343,7 +3448,7 @@ struct file_reader *file_reader_alloc(const char *file_name) {
     fr->item_index = NewHashTab();
     log_check(fr->item_index != NULL, "NewHashTab failed");
 
-    file_reader_index(fr);
+    file_reader_indexing(fr);
 
     return fr;
 }
@@ -3362,8 +3467,15 @@ char *file_reader_get_a_record(struct file_reader *fr, char *domain, char *ip) {
         return NULL;
     }
 
+    char tdomain[512];
     fseek(fr->fd, *pcur, SEEK_SET);
-    fscanf(fr->fd, "%s", ip);
+    fscanf(fr->fd, "%s %s", ip, tdomain);
+
+    if (strcmp(domain, tdomain) != 0) {
+        file_reader_indexing(fr);
+        return NULL;
+    }
+
     return ip;
 }
 ```
@@ -3575,7 +3687,7 @@ void Close(int fd)
 }
 ```
 
-### 压力测试
+### 并发测试
 
 #### dns_test.py
 
