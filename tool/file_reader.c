@@ -1,16 +1,16 @@
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 
 #include "file_reader.h"
 #include "clog.h"
 #include "hash.h"
 
-static void file_reader_index(struct file_reader *fr) {
+static void file_reader_indexing(struct file_reader *fr) {
     char ip[16], domain[512];
     long cur;
-    while(cur = ftell(fr->fd), fscanf(fr->fd, "%s %s\n", ip, domain) != EOF) {
-        insert(fr->item_index, domain, &cur, sizeof cur);
+    fseek(fr->fd, 0, SEEK_SET);
+    while(cur = ftell(fr->fd), fscanf(fr->fd, "%s %s", ip, domain) != EOF) {
+        insert(fr->item_index, domain, &cur, sizeof(cur));
     }
 }
 
@@ -24,7 +24,7 @@ struct file_reader *file_reader_alloc(const char *file_name) {
     fr->item_index = NewHashTab();
     log_check(fr->item_index != NULL, "NewHashTab failed");
 
-    file_reader_index(fr);
+    file_reader_indexing(fr);
 
     return fr;
 }
@@ -43,7 +43,14 @@ char *file_reader_get_a_record(struct file_reader *fr, char *domain, char *ip) {
         return NULL;
     }
 
+    char tdomain[512];
     fseek(fr->fd, *pcur, SEEK_SET);
-    fscanf(fr->fd, "%s", ip);
+    fscanf(fr->fd, "%s %s", ip, tdomain);
+
+    if (strcmp(domain, tdomain) != 0) {
+        file_reader_indexing(fr);
+        return NULL;
+    }
+
     return ip;
 }
